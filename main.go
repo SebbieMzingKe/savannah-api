@@ -40,12 +40,21 @@ func init()  {
 
 func main() {
 	customerHandler := handlers.NewCustomerHandler(db)
+	// orderHandler := handlers.NewOrderHandler(db, smsService)
+	authHandler := handlers.NewAuthHandler()
 
 	r := gin.Default()
 
 	r.GET("/health", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"status": "ok"})
 	})
+
+	auth := r.Group("/auth")
+	{
+		auth.POST("/login", authHandler.Login)
+		auth.POST("/callback", authHandler.Callback)
+		auth.GET("/userinfo",)
+	}
 
 	api := r.Group("/api/v1")
 	api.Use()

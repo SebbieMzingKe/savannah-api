@@ -1,216 +1,321 @@
-package services
+package middleware
 
 import (
-	"bytes"
-	"encoding/json"
+	"context"
 	"fmt"
+	"math/rand"
 	"net/http"
-	"net/url"
 	"strings"
+	"time"
+
+	"github.com/gin-gonic/gin"
+	"github.com/golang-jwt/jwt/v4"
+
+	"savannah-api/internal/handlers"
+	"savannah-api/internal/models"
 )
 
-type SMSService struct {
-	username string
-	apiKey   string
-	senderID string
-	baseURL  string
-}
+// AuthMiddleware validates JWT tokens and sets user context
+func AuthMiddleware() gin.HandlerFunc {
+	authHandler := handlers.NewAuthHandler()
+	
+	return func(c *gin.Context) {
+		// Get Authorization header
+		authHeader := c.GetHeader("Authorization")
+		if authHeader == "" {
+			c.JSON(http.StatusUnauthorized, models.ErrorResponse{
+				Error:   "missing_token",
+				Message: "Authorization header is required",
+				Code:    http.StatusUnauthorized,
+			})
+			c.Abort()
+			return
+		}
 
-type SMSRequest struct {
-	Username string `json:"username"`
-	To       string `json:"to"`
-	Message  string `json:"message"`
-	From     string `json:"from,omitempty"`
-}
+		// Extract token from "Bearer <token>" format
+		parts := strings.SplitN(authHeader, " ", 2)
+		if len(parts) != 2 || parts[0] != "Bearer" {
+			c.JSON(http.StatusUnauthorized, models.ErrorResponse{
+				Error:   "invalid_token_format",
+				Message: "Authorization header must be in format 'Bearer <token>'",
+				Code:    http.StatusUnauthorized,
+			})
+			c.Abort()
+			return
+		}
 
-type SMSResponse struct {
-	SMSMessageData struct {
-		Message    string `json:"Message"`
-		Recipients []struct {
-			StatusCode   int    `json:"statusCode"`
-			Number       string `json:"number"`
-			Status       string `json:"status"`
-			Cost         string `json:"cost"`
-			MessageID    string `json:"messageId"`
-			MessageParts int    `json:"messageParts"`
-		} `json:"Recipients"`
-	} `json:"SMSMessageData"`
-}
+		tokenString := parts[1]
 
-// NewSMSService creates a new SMS service instance
-func NewSMSService(username, apiKey, senderID string) *SMSService {
-	return &SMSService{
-		username: username,
-		apiKey:   apiKey,
-		senderID: senderID,
-		baseURL:  "https://api.sandbox.africastalking.com/version1/messaging", // Use sandbox for testing
+		// Validate token
+		claims, err := authHandler.ValidateToken(tokenString)
+		if err != nil {
+			var errorMsg string
+			if ve, ok := err.(*jwt.ValidationError); ok {
+				if ve.Errors&jwt.ValidationErrorMalformed != 0 {
+					errorMsg = "Malformed token"
+				} else if ve.Errors&(jwt.ValidationErrorExpired|jwt.ValidationErrorNotValidYet) != 0 {
+					errorMsg = "Token expired or not active yet"
+				} else {
+					errorMsg = "Invalid token"
+				}
+			} else {
+				errorMsg = "Invalid token"
+			}
+
+			c.JSON(http.StatusUnauthorized, models.ErrorResponse{
+				Error:   "invalid_token",
+				Message: errorMsg,
+				Code:    http.StatusUnauthorized,
+			})
+			c.Abort()
+			return
+		}
+
+		// Set claims in context for use in handlers
+		c.Set("claims", claims)
+		c.Set("user_email", claims.Email)
+		c.Set("user_sub", claims.Sub)
+
+		c.Next()
 	}
 }
 
-// SendSMS sends an SMS message using Africa's Talking API
-func (s *SMSService) SendSMS(to, message string) error {
-	// Prepare the request data
-	data := url.Values{}
-	data.Set("username", s.username)
-	data.Set("to", s.formatPhoneNumber(to))
-	data.Set("message", message)
-	if s.senderID != "" {
-		data.Set("from", s.senderID)
+// CORSMiddleware handles Cross-Origin Resource Sharing
+func CORSMiddleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		c.Writer.Header().Set("Access-Control-Allow-Origin", "*")
+		c.Writer.Header().Set("Access-Control-Allow-Credentials", "true")
+		c.Writer.Header().Set("Access-Control-Allow-Headers", "Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization, accept, origin, Cache-Control, X-Requested-With")
+		c.Writer.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS, GET, PUT, DELETE, PATCH")
+		c.Writer.Header().Set("Access-Control-Expose-Headers", "Content-Length, Access-Control-Allow-Origin, Access-Control-Allow-Headers, Content-Type")
+		c.Writer.Header().Set("Access-Control-Max-Age", "86400")
+
+		if c.Request.Method == "OPTIONS" {
+			c.AbortWithStatus(http.StatusNoContent)
+			return
+		}
+
+		c.Next()
 	}
-
-	// Create the HTTP request
-	req, err := http.NewRequest("POST", s.baseURL, strings.NewReader(data.Encode()))
-	if err != nil {
-		return fmt.Errorf("failed to create request: %w", err)
-	}
-
-	// Set headers
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	req.Header.Set("Accept", "application/json")
-	req.Header.Set("apiKey", s.apiKey)
-
-	// Send the request
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	if err != nil {
-		return fmt.Errorf("failed to send request: %w", err)
-	}
-	defer resp.Body.Close()
-
-	// Parse the response
-	var smsResponse SMSResponse
-	if err := json.NewDecoder(resp.Body).Decode(&smsResponse); err != nil {
-		return fmt.Errorf("failed to decode response: %w", err)
-	}
-
-	// Check if the SMS was sent successfully
-	if len(smsResponse.SMSMessageData.Recipients) == 0 {
-		return fmt.Errorf("no recipients in response")
-	}
-
-	recipient := smsResponse.SMSMessageData.Recipients[0]
-	if recipient.StatusCode != 101 && recipient.StatusCode != 102 {
-		return fmt.Errorf("SMS failed to send: %s (code: %d)", recipient.Status, recipient.StatusCode)
-	}
-
-	return nil
 }
 
-// SendBulkSMS sends SMS to multiple recipients
-func (s *SMSService) SendBulkSMS(recipients []string, message string) error {
-	// Join phone numbers with commas
-	to := strings.Join(s.formatPhoneNumbers(recipients), ",")
+// LoggingMiddleware provides detailed request/response logging
+func LoggingMiddleware() gin.HandlerFunc {
+	return gin.LoggerWithFormatter(func(param gin.LogFormatterParams) string {
+		return fmt.Sprintf("%s - [%s] \"%s %s %s %d %s \"%s\" %s\"\n",
+			param.ClientIP,
+			param.TimeStamp.Format("02/Jan/2006:15:04:05 -0700"),
+			param.Method,
+			param.Path,
+			param.Request.Proto,
+			param.StatusCode,
+			param.Latency,
+			param.Request.UserAgent(),
+			param.ErrorMessage,
+		)
+	})
+}
 
-	// Prepare the request data
-	data := url.Values{}
-	data.Set("username", s.username)
-	data.Set("to", to)
-	data.Set("message", message)
-	if s.senderID != "" {
-		data.Set("from", s.senderID)
+// SecurityHeadersMiddleware adds security headers to responses
+func SecurityHeadersMiddleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		// Prevent MIME type sniffing
+		c.Header("X-Content-Type-Options", "nosniff")
+		
+		// Prevent clickjacking
+		c.Header("X-Frame-Options", "DENY")
+		
+		// Enable XSS protection
+		c.Header("X-XSS-Protection", "1; mode=block")
+		
+		// Control referrer policy
+		c.Header("Referrer-Policy", "strict-origin-when-cross-origin")
+		
+		// Content Security Policy
+		c.Header("Content-Security-Policy", "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self'")
+		
+		// Prevent information disclosure
+		c.Header("X-Powered-By", "")
+		c.Header("Server", "")
+		
+		// HSTS (only if using HTTPS)
+		if c.Request.TLS != nil {
+			c.Header("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
+		}
+
+		c.Next()
+	}
+}
+
+// RateLimitMiddleware implements basic rate limiting
+func RateLimitMiddleware() gin.HandlerFunc {
+	// Simple in-memory rate limiter (for production, use Redis)
+	type client struct {
+		requests []time.Time
+		limit    int
+		window   time.Duration
 	}
 
-	// Create the HTTP request
-	req, err := http.NewRequest("POST", s.baseURL, strings.NewReader(data.Encode()))
-	if err != nil {
-		return fmt.Errorf("failed to create request: %w", err)
+	clients := make(map[string]*client)
+	defaultLimit := 100 // requests per minute
+	defaultWindow := time.Minute
+
+	return func(c *gin.Context) {
+		clientIP := c.ClientIP()
+		now := time.Now()
+
+		// Initialize client if not exists
+		if clients[clientIP] == nil {
+			clients[clientIP] = &client{
+				requests: make([]time.Time, 0),
+				limit:    defaultLimit,
+				window:   defaultWindow,
+			}
+		}
+
+		client := clients[clientIP]
+
+		// Remove old requests outside the window
+		var validRequests []time.Time
+		for _, req := range client.requests {
+			if now.Sub(req) < client.window {
+				validRequests = append(validRequests, req)
+			}
+		}
+		client.requests = validRequests
+
+		// Check if limit exceeded
+		if len(client.requests) >= client.limit {
+			c.JSON(http.StatusTooManyRequests, models.ErrorResponse{
+				Error:   "rate_limit_exceeded",
+				Message: "Too many requests, please try again later",
+				Code:    http.StatusTooManyRequests,
+			})
+			c.Abort()
+			return
+		}
+
+		// Add current request
+		client.requests = append(client.requests, now)
+
+		// Add rate limit headers
+		c.Header("X-RateLimit-Limit", fmt.Sprintf("%d", client.limit))
+		c.Header("X-RateLimit-Remaining", fmt.Sprintf("%d", client.limit-len(client.requests)))
+		c.Header("X-RateLimit-Reset", fmt.Sprintf("%d", now.Add(client.window).Unix()))
+
+		c.Next()
 	}
+}
 
-	// Set headers
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	req.Header.Set("Accept", "application/json")
-	req.Header.Set("apiKey", s.apiKey)
+// RequestIDMiddleware adds a unique request ID to each request
+func RequestIDMiddleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		requestID := c.GetHeader("X-Request-ID")
+		if requestID == "" {
+			requestID = generateRequestID()
+		}
 
-	// Send the request
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	if err != nil {
-		return fmt.Errorf("failed to send request: %w", err)
+		c.Set("request_id", requestID)
+		c.Header("X-Request-ID", requestID)
+		
+		c.Next()
 	}
-	defer resp.Body.Close()
+}
 
-	// Parse the response
-	var smsResponse SMSResponse
-	if err := json.NewDecoder(resp.Body).Decode(&smsResponse); err != nil {
-		return fmt.Errorf("failed to decode response: %w", err)
-	}
+// TimeoutMiddleware sets a timeout for requests
+func TimeoutMiddleware(timeout time.Duration) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		ctx, cancel := context.WithTimeout(c.Request.Context(), timeout)
+		defer cancel()
 
-	// Check if at least one SMS was sent successfully
-	successCount := 0
-	for _, recipient := range smsResponse.SMSMessageData.Recipients {
-		if recipient.StatusCode == 101 || recipient.StatusCode == 102 {
-			successCount++
+		c.Request = c.Request.WithContext(ctx)
+		
+		done := make(chan struct{})
+		go func() {
+			c.Next()
+			done <- struct{}{}
+		}()
+
+		select {
+		case <-done:
+			return
+		case <-ctx.Done():
+			c.JSON(http.StatusRequestTimeout, models.ErrorResponse{
+				Error:   "request_timeout",
+				Message: "Request timeout",
+				Code:    http.StatusRequestTimeout,
+			})
+			c.Abort()
 		}
 	}
-
-	if successCount == 0 {
-		return fmt.Errorf("failed to send SMS to any recipient")
-	}
-
-	return nil
 }
 
-// formatPhoneNumber formats a phone number for Africa's Talking API
-// Ensures the number is in international format with country code
-func (s *SMSService) formatPhoneNumber(phone string) string {
-	// Remove any spaces, dashes, or parentheses
-	phone = strings.ReplaceAll(phone, " ", "")
-	phone = strings.ReplaceAll(phone, "-", "")
-	phone = strings.ReplaceAll(phone, "(", "")
-	phone = strings.ReplaceAll(phone, ")", "")
+// AdminMiddleware checks if user has admin privileges
+func AdminMiddleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		claims, exists := c.Get("claims")
+		if !exists {
+			c.JSON(http.StatusUnauthorized, models.ErrorResponse{
+				Error:   "unauthorized",
+				Message: "Authentication required",
+				Code:    http.StatusUnauthorized,
+			})
+			c.Abort()
+			return
+		}
 
-	// If the number starts with 0, replace with +254 (Kenya country code)
-	if strings.HasPrefix(phone, "0") {
-		phone = "+254" + phone[1:]
-	}
+		userClaims := claims.(*handlers.Claims)
+		
+		// Check if user has admin role (customize based on your auth system)
+		if userClaims.Email != "admin@savannahinformatics.com" {
+			c.JSON(http.StatusForbidden, models.ErrorResponse{
+				Error:   "forbidden",
+				Message: "Admin privileges required",
+				Code:    http.StatusForbidden,
+			})
+			c.Abort()
+			return
+		}
 
-	// If the number doesn't start with +, add +254
-	if !strings.HasPrefix(phone, "+") {
-		phone = "+254" + phone
-	}
-
-	return phone
-}
-
-// formatPhoneNumbers formats multiple phone numbers
-func (s *SMSService) formatPhoneNumbers(phones []string) []string {
-	formatted := make([]string, len(phones))
-	for i, phone := range phones {
-		formatted[i] = s.formatPhoneNumber(phone)
-	}
-	return formatted
-}
-
-// MockSMSService for testing purposes
-type MockSMSService struct {
-	SentMessages []MockSMSMessage
-}
-
-type MockSMSMessage struct {
-	To      string
-	Message string
-}
-
-func NewMockSMSService() *MockSMSService {
-	return &MockSMSService{
-		SentMessages: make([]MockSMSMessage, 0),
+		c.Next()
 	}
 }
 
-func (m *MockSMSService) SendSMS(to, message string) error {
-	m.SentMessages = append(m.SentMessages, MockSMSMessage{
-		To:      to,
-		Message: message,
-	})
-	return nil
+// ValidationMiddleware provides additional input validation
+func ValidationMiddleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		// Add custom validation logic here
+		// For example, check content type for POST/PUT requests
+		if c.Request.Method == "POST" || c.Request.Method == "PUT" {
+			contentType := c.GetHeader("Content-Type")
+			if !strings.Contains(contentType, "application/json") {
+				c.JSON(http.StatusUnsupportedMediaType, models.ErrorResponse{
+					Error:   "unsupported_media_type",
+					Message: "Content-Type must be application/json",
+					Code:    http.StatusUnsupportedMediaType,
+				})
+				c.Abort()
+				return
+			}
+		}
+
+		c.Next()
+	}
 }
 
-func (m *MockSMSService) SendBulkSMS(recipients []string, message string) error {
-	for _, recipient := range recipients {
-		m.SentMessages = append(m.SentMessages, MockSMSMessage{
-			To:      recipient,
-			Message: message,
-		})
+// Helper functions
+
+// generateRequestID creates a unique request ID
+func generateRequestID() string {
+	return fmt.Sprintf("%d-%s", time.Now().UnixNano(), randomString(8))
+}
+
+// randomString generates a random string of specified length
+func randomString(length int) string {
+	const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+	b := make([]byte, length)
+	for i := range b {
+		b[i] = charset[rand.Intn(len(charset))]
 	}
-	return nil
+	return string(b)
 }

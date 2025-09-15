@@ -171,7 +171,7 @@ func (h *AuthHandler) ValidateToken(tokenString string) (*Claims, error) {
 		return h.jwtSecret, nil
 	})
 
-	if err != nil {
+	if err != nil || !token.Valid {
 		return nil, err
 	}
 

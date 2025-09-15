@@ -1,211 +1,108 @@
-package handlers
+package main
 
 import (
+	"log"
 	"net/http"
-	"strconv"
+	"os"
 
 	"github.com/gin-gonic/gin"
+	"github.com/joho/godotenv"
+	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 
+	"savannah-api/internal/auth"
+	"savannah-api/internal/handlers"
+	"savannah-api/internal/middleware"
 	"savannah-api/internal/models"
+	"savannah-api/internal/services"
 )
 
-type CustomerHandler struct {
-	db *gorm.DB
+var db *gorm.DB
+
+func init() {
+	// Load environment variables
+	if err := godotenv.Load(); err != nil {
+		log.Println("No .env file found")
+	}
+
+	// Connect to database
+	var err error
+	dsn := os.Getenv("DATABASE_URL")
+	if dsn == "" {
+		dsn = "host=localhost user=savannah password=savannah dbname=savannah port=5432 sslmode=disable"
+	}
+
+	db, err = gorm.Open(postgres.Open(dsn), &gorm.Config{})
+	if err != nil {
+		log.Fatal("Failed to connect to database:", err)
+	}
+
+	// Auto-migrate the schema
+	err = db.AutoMigrate(&models.Customer{}, &models.Order{})
+	if err != nil {
+		log.Fatal("Failed to migrate database:", err)
+	}
 }
 
-func NewCustomerHandler(db *gorm.DB) *CustomerHandler {
-	return &CustomerHandler{db: db}
-}
+func main() {
+	// Initialize services
+	smsService := services.NewSMSService(
+		os.Getenv("AFRICASTALKING_USERNAME"),
+		os.Getenv("AFRICASTALKING_API_KEY"),
+		os.Getenv("AFRICASTALKING_SENDER_ID"),
+	)
 
-// CreateCustomer creates a new customer
-func (h *CustomerHandler) CreateCustomer(c *gin.Context) {
-	var req models.CreateCustomerRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, models.ErrorResponse{
-			Error:   "invalid_request",
-			Message: err.Error(),
-			Code:    http.StatusBadRequest,
-		})
-		return
-	}
+	// Initialize handlers
+	customerHandler := handlers.NewCustomerHandler(db)
+	orderHandler := handlers.NewOrderHandler(db, smsService)
+	authHandler := handlers.NewAuthHandler()
 
-	// Check if customer code already exists
-	var existingCustomer models.Customer
-	if err := h.db.Where("code = ?", req.Code).First(&existingCustomer).Error; err == nil {
-		c.JSON(http.StatusConflict, models.ErrorResponse{
-			Error:   "customer_exists",
-			Message: "Customer with this code already exists",
-			Code:    http.StatusConflict,
-		})
-		return
-	}
+	// Setup router
+	r := gin.Default()
 
-	customer := models.Customer{
-		Name:  req.Name,
-		Code:  req.Code,
-		Phone: req.Phone,
-		Email: req.Email,
-	}
-
-	if err := h.db.Create(&customer).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse{
-			Error:   "database_error",
-			Message: "Failed to create customer",
-			Code:    http.StatusInternalServerError,
-		})
-		return
-	}
-
-	c.JSON(http.StatusCreated, customer)
-}
-
-// GetCustomers retrieves all customers with pagination
-func (h *CustomerHandler) GetCustomers(c *gin.Context) {
-	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
-	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "10"))
-	offset := (page - 1) * limit
-
-	var customers []models.Customer
-	var total int64
-
-	// Get total count
-	h.db.Model(&models.Customer{}).Count(&total)
-
-	// Get paginated results with preloaded orders
-	if err := h.db.Preload("Orders").Offset(offset).Limit(limit).Find(&customers).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse{
-			Error:   "database_error",
-			Message: "Failed to retrieve customers",
-			Code:    http.StatusInternalServerError,
-		})
-		return
-	}
-
-	c.JSON(http.StatusOK, gin.H{
-		"customers": customers,
-		"total":     total,
-		"page":      page,
-		"limit":     limit,
+	// Health check endpoint
+	r.GET("/health", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{"status": "ok"})
 	})
-}
 
-// GetCustomer retrieves a specific customer by ID
-func (h *CustomerHandler) GetCustomer(c *gin.Context) {
-	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, models.ErrorResponse{
-			Error:   "invalid_id",
-			Message: "Invalid customer ID",
-			Code:    http.StatusBadRequest,
-		})
-		return
+	// Auth routes
+	auth := r.Group("/auth")
+	{
+		auth.POST("/login", authHandler.Login)
+		auth.POST("/callback", authHandler.Callback)
+		auth.GET("/userinfo", middleware.AuthMiddleware(), authHandler.UserInfo)
 	}
 
-	var customer models.Customer
-	if err := h.db.Preload("Orders").First(&customer, id).Error; err != nil {
-		if err == gorm.ErrRecordNotFound {
-			c.JSON(http.StatusNotFound, models.ErrorResponse{
-				Error:   "customer_not_found",
-				Message: "Customer not found",
-				Code:    http.StatusNotFound,
-			})
-			return
+	// API routes with authentication
+	api := r.Group("/api/v1")
+	api.Use(middleware.AuthMiddleware())
+	{
+		// Customer routes
+		customers := api.Group("/customers")
+		{
+			customers.POST("", customerHandler.CreateCustomer)
+			customers.GET("", customerHandler.GetCustomers)
+			customers.GET("/:id", customerHandler.GetCustomer)
+			customers.PUT("/:id", customerHandler.UpdateCustomer)
+			customers.DELETE("/:id", customerHandler.DeleteCustomer)
 		}
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse{
-			Error:   "database_error",
-			Message: "Failed to retrieve customer",
-			Code:    http.StatusInternalServerError,
-		})
-		return
-	}
 
-	c.JSON(http.StatusOK, customer)
-}
-
-// UpdateCustomer updates an existing customer
-func (h *CustomerHandler) UpdateCustomer(c *gin.Context) {
-	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, models.ErrorResponse{
-			Error:   "invalid_id",
-			Message: "Invalid customer ID",
-			Code:    http.StatusBadRequest,
-		})
-		return
-	}
-
-	var req models.UpdateCustomerRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, models.ErrorResponse{
-			Error:   "invalid_request",
-			Message: err.Error(),
-			Code:    http.StatusBadRequest,
-		})
-		return
-	}
-
-	var customer models.Customer
-	if err := h.db.First(&customer, id).Error; err != nil {
-		if err == gorm.ErrRecordNotFound {
-			c.JSON(http.StatusNotFound, models.ErrorResponse{
-				Error:   "customer_not_found",
-				Message: "Customer not found",
-				Code:    http.StatusNotFound,
-			})
-			return
+		// Order routes
+		orders := api.Group("/orders")
+		{
+			orders.POST("", orderHandler.CreateOrder)
+			orders.GET("", orderHandler.GetOrders)
+			orders.GET("/:id", orderHandler.GetOrder)
+			orders.PUT("/:id", orderHandler.UpdateOrder)
+			orders.DELETE("/:id", orderHandler.DeleteOrder)
 		}
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse{
-			Error:   "database_error",
-			Message: "Failed to retrieve customer",
-			Code:    http.StatusInternalServerError,
-		})
-		return
 	}
 
-	// Update fields if provided
-	if req.Name != "" {
-		customer.Name = req.Name
-	}
-	if req.Phone != "" {
-		customer.Phone = req.Phone
-	}
-	if req.Email != "" {
-		customer.Email = req.Email
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
 	}
 
-	if err := h.db.Save(&customer).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse{
-			Error:   "database_error",
-			Message: "Failed to update customer",
-			Code:    http.StatusInternalServerError,
-		})
-		return
-	}
-
-	c.JSON(http.StatusOK, customer)
-}
-
-// DeleteCustomer deletes a customer
-func (h *CustomerHandler) DeleteCustomer(c *gin.Context) {
-	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, models.ErrorResponse{
-			Error:   "invalid_id",
-			Message: "Invalid customer ID",
-			Code:    http.StatusBadRequest,
-		})
-		return
-	}
-
-	if err := h.db.Delete(&models.Customer{}, id).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse{
-			Error:   "database_error",
-			Message: "Failed to delete customer",
-			Code:    http.StatusInternalServerError,
-		})
-		return
-	}
-
-	c.JSON(http.StatusOK, gin.H{"message": "Customer deleted successfully"})
+	log.Printf("Server starting on port %s", port)
+	log.Fatal(http.ListenAndServe(":"+port, r))
 }

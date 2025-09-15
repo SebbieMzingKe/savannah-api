@@ -10,27 +10,27 @@ import (
 
 type SMSService struct {
 	username string
-	apiKey string
+	apiKey   string
 	senderId string
-	baseUrl string
+	baseUrl  string
 }
 
 type SMSRequest struct {
 	Username string `json:"username"`
-	To string `json:"to"`
-	Message string `json:"message"`
-	From string `json:"from"`
+	To       string `json:"to"`
+	Message  string `json:"message"`
+	From     string `json:"from"`
 }
 
 type SMSResponse struct {
 	SMSMessageData struct {
-		Message string `json:"Message"`
+		Message    string `json:"Message"`
 		Recipients []struct {
-			StatusCode int `json:"statusCode"`
-			Number string `json:"number"`
-			Status string `json:"statusCstatusode"`
-			Cost string `json:"cost"`
-			MessageId string `json:"messageId"`
+			StatusCode int    `json:"statusCode"`
+			Number     string `json:"number"`
+			Status     string `json:"statusCstatusode"`
+			Cost       string `json:"cost"`
+			MessageId  string `json:"messageId"`
 		} `json:"Recipients"`
 	} `json:"SMSMessageData"`
 }
@@ -38,9 +38,9 @@ type SMSResponse struct {
 func NewSMSService(username, apiKey, senderID string) *SMSService {
 	return &SMSService{
 		username: username,
-		apiKey: apiKey,
+		apiKey:   apiKey,
 		senderId: senderID,
-		baseUrl: "https://api.sandbox.africastalking.com/version1/messaging",
+		baseUrl:  "https://api.sandbox.africastalking.com/version1/messaging",
 	}
 }
 
@@ -67,7 +67,7 @@ func (s *SMSService) SendSMS(to, message string) error {
 	resp, err := client.Do(req)
 
 	if err != nil {
-		return  fmt.Errorf("failed to send request: %w", err)
+		return fmt.Errorf("failed to send request: %w", err)
 	}
 
 	defer resp.Body.Close()
@@ -76,7 +76,7 @@ func (s *SMSService) SendSMS(to, message string) error {
 	if err := json.NewDecoder(resp.Body).Decode(&smsResponse); err != nil {
 		return fmt.Errorf("failed to send request: %w", err)
 	}
-	
+
 	if (len(smsResponse.SMSMessageData.Recipients)) == 0 {
 		return fmt.Errorf("no recipiients in response")
 	}
@@ -88,6 +88,114 @@ func (s *SMSService) SendSMS(to, message string) error {
 	return nil
 }
 
+func (s *SMSService) SendBulkSMS(recipients []string, message string) error {
+
+	to := strings.Join(s.formatPhoneNumbers(recipients), ",")
+
+	data := url.Values{}
+	data.Set("username", s.username)
+	data.Set("to", to)
+	data.Set("message", message)
+
+	if s.senderId != "" {
+		data.Set("from", s.senderId)
+	}
+
+	req, err := http.NewRequest("POST", s.baseUrl, strings.NewReader(data.Encode()))
+
+	if err != nil {
+		return fmt.Errorf("failed to create request: %w", err)
+	}
+
+	req.Header.Set("Content-Type", "application/x-wwww-form-urlencoded")
+	req.Header.Set("Accept", "application/json")
+	req.Header.Set("apikey", s.apiKey)
+
+	client := &http.Client{}
+
+	resp, err := client.Do(req)
+
+	if err != nil {
+		return fmt.Errorf("failed to send request: %w", err)
+	}
+
+	defer resp.Body.Close()
+
+	var smsResponse SMSResponse
+
+	if err := json.NewDecoder(resp.Body).Decode(&smsResponse); err != nil {
+		return fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	succesCount := 0
+
+	for _, recipient := range smsResponse.SMSMessageData.Recipients {
+		if recipient.StatusCode == 101 || recipient.StatusCode == 102 {
+			succesCount++
+		}
+	}
+
+	if succesCount == 0 {
+		return fmt.Errorf("failed to send sms to any recipient")
+	}
+	return nil
+}
+
 func (s *SMSService) formatPhoneNumber(phone string) string {
+	phone = strings.ReplaceAll(phone, " ", "")
+	phone = strings.ReplaceAll(phone, "-", "")
+	phone = strings.ReplaceAll(phone, "(", "")
+	phone = strings.ReplaceAll(phone, ")", "")
+
+	if strings.HasPrefix(phone, "0") {
+		phone = "+254" + phone[1:]
+	}
+
+	if !strings.HasPrefix(phone, "+") {
+		phone = "+254" + phone
+	}
+
 	return phone
+}
+
+func (s *SMSService) formatPhoneNumbers(phones []string) []string {
+	formatted := make([]string, len(phones))
+	for i, phone := range phones {
+		formatted[i] = s.formatPhoneNumber(phone)
+	}
+	return formatted
+}
+
+type MockSMSService struct {
+	SentMessages []MockSMSMessage
+}
+
+type MockSMSMessage struct {
+	To      string
+	Message string
+}
+
+func NewMockSMSService() *MockSMSService {
+	return &MockSMSService{
+		SentMessages: make([]MockSMSMessage, 0),
+	}
+}
+
+func (m *MockSMSService) SendSMS(to, message string) error {
+	m.SentMessages = append(m.SentMessages, MockSMSMessage{
+		To:      to,
+		Message: message,
+	})
+	return nil
+}
+
+func (m *MockSMSService) SendBulkSMS(recipients []string, message string) error {
+	for _, recipient := range recipients {
+
+		m.SentMessages = append(m.SentMessages, MockSMSMessage{
+			To:      recipient,
+			Message: message,
+		})
+	}
+	return nil
 }

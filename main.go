@@ -48,4 +48,11 @@ func main() {
 	})
 
 	api := r.Group("/api/v1")
+	api.Use()
+	{
+		customers := api.Group("/customers")
+		{
+			customers.POST("", customerHandler.CreateCustomer)
+		}
+	}
 }

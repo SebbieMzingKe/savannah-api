@@ -8,6 +8,7 @@ import (
 	"github.com/SebbieMzingKe/customer-order-api/internal/handlers"
 	"github.com/SebbieMzingKe/customer-order-api/internal/middleware"
 	"github.com/SebbieMzingKe/customer-order-api/internal/models"
+	"github.com/SebbieMzingKe/customer-order-api/internal/services"
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
 	"gorm.io/driver/postgres"
@@ -40,8 +41,16 @@ func init()  {
 }
 
 func main() {
+
+	smsService := services.NewSMSService(
+		os.Getenv("AFRICAS_TALKING_USERNAME"),
+		os.Getenv("AFRICAS_TALKING_API_KEY"),
+		os.Getenv("AFRICAS_TALKING_SENDER_ID"),
+	)
+
+
 	customerHandler := handlers.NewCustomerHandler(db)
-	// orderHandler := handlers.NewOrderHandler(db, smsService)
+	orderHandler := handlers.NewOrderHandler(db, smsService)
 	authHandler := handlers.NewAuthHandler()
 
 	r := gin.Default()
@@ -58,7 +67,7 @@ func main() {
 	}
 
 	api := r.Group("/api/v1")
-	api.Use()
+	api.Use(middleware.AuthMiddleware())
 	{
 		customers := api.Group("/customers")
 		{
@@ -67,6 +76,15 @@ func main() {
 			customers.GET("/:id", customerHandler.GetCustomer)
 			customers.PUT("/:id", customerHandler.UpdateCustomer)
 			customers.DELETE("/:id", customerHandler.DeleteCustomer)
+		}
+		
+		orders := api.Group("/orders")
+		{
+			orders.POST("", orderHandler.CreateOrder)
+			orders.GET("", orderHandler.GetOrders)
+			orders.GET("/:id", orderHandler.GetOrder)
+			orders.PUT("/:id", orderHandler.UpdateOrder)
+			orders.DELETE("/:id", orderHandler.DeleteOrder)
 		}
 	}
 

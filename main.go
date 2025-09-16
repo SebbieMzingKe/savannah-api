@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"github.com/SebbieMzingKe/customer-order-api/internal/handlers"
+	"github.com/SebbieMzingKe/customer-order-api/internal/middleware"
 	"github.com/SebbieMzingKe/customer-order-api/internal/models"
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
@@ -48,4 +49,23 @@ func main() {
 	})
 
 	api := r.Group("/api/v1")
+	api.Use(middleware.AdminMiddleware())
+	{
+		customers := api.Group("/customers")
+		{
+			customers.POST("", customerHandler.CreateCustomer)
+			customers.GET("", customerHandler.GetCustomers)
+			customers.GET("/:id", customerHandler.GetCustomer)
+			customers.PUT("/:id", customerHandler.UpdateCustomer)
+			customers.DELETE("/:id", customerHandler.DeleteCustomer)
+		}
+	}
+
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
+	}
+
+	log.Printf("server is starting on port %s", port)
+	log.Fatal(http.ListenAndServe(":"+port, r))
 }

@@ -47,7 +47,8 @@ type UpdateCustomerRequest struct {
 type CreateOrderRequest struct {
 	Item   string    `json:"item" binding:"required"`
 	Amount float64   `json:"amount" binding:"required, min=0"`
-	TIme   time.Time `json:"time" binding:"required"`
+	Time   time.Time `json:"time" binding:"required"`
+	CustomerID uint      `json:"customer_id" binding:"required"`
 }
 
 type UpdateOrderRequest struct {

@@ -56,12 +56,11 @@ func (h *OrderHandler) CreateOrder(c *gin.Context) {
 		return
 	}
 
-	order := models.Order{
-		Item:       req.Item,
-		Amount:     req.Amount,
-		Time:       req.Time,
-		CustomerID: req.CustomerID,
-	}
+order := models.Order{
+	Item:       req.Item,
+	Amount:     req.Amount,
+	Time:       req.Time,
+	CustomerID: req.CustomerID,
 }
 
 	if err := h.db.Create(&order).Error; err != nil {

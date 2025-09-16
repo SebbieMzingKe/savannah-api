@@ -62,6 +62,7 @@ func (h *OrderHandler) CreateOrder(c *gin.Context) {
 		Time:       req.Time,
 		CustomerID: req.CustomerID,
 	}
+}
 
 	if err := h.db.Create(&order).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, models.ErrorResponse{
@@ -162,6 +163,7 @@ func (h *OrderHandler) UpdateOrder(c *gin.Context) {
 		})
 		return
 	}
+}
 
 	var req models.UpdateOrderRequest
 	if err := c.ShouldBindJSON(&req); err != nil {

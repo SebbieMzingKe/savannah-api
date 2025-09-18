@@ -36,7 +36,7 @@ func init()  {
 
 	err = db.AutoMigrate(&models.Customer{}, &models.Order{})
 	if err != nil {
-		log.Fatal("failed to migrae database", err)
+		log.Fatal("failed to migrate database", err)
 	}
 }
 

@@ -32,27 +32,27 @@ type Order struct {
 }
 
 type CreateCustomerRequest struct {
-	Name string `json:"name" binding:"required"`
-	Code string `json:"code" binding:"required"`
+	Name  string `json:"name" binding:"required"`
+	Code  string `json:"code" binding:"required"`
 	Phone string `json:"phone" binding:"required"`
 	Email string `json:"email" binding:"email"`
 }
 
 type UpdateCustomerRequest struct {
-	Name string `json:"name"`
+	Name  string `json:"name"`
 	Phone string `json:"phone"`
 	Email string `json:"email" binding:"omitempty, email"`
 }
 
 type CreateOrderRequest struct {
-	Item string `json:"item" binding:"required"`
-	Amount float64 `json:"amount" binding:"required, min=0"`
-	TIme time.Time `json:"time" binding:"required"`
+	Item   string    `json:"item" binding:"required"`
+	Amount float64   `json:"amount" binding:"required, min=0"`
+	TIme   time.Time `json:"time" binding:"required"`
 }
 
 type UpdateOrderRequest struct {
-	Item   string  `json:"item"`
-	Amount float64 `json:"amount" binding:"omitempty,min=0"`
+	Item   string    `json:"item"`
+	Amount float64   `json:"amount" binding:"omitempty,min=0"`
 	Time   time.Time `json:"time"`
 }
 
@@ -62,14 +62,14 @@ type LoginRequest struct {
 }
 
 type AuthResponse struct {
-	AccessToken string `json:"access_token"`
+	AccessToken  string `json:"access_token"`
 	RefreshToken string `json:"refresh_token"`
-	ExpiresIn int64 `json:"expires_in"`
-	TokenType int64 `json:"token_type"`
+	ExpiresIn    int64  `json:"expires_in"`
+	TokenType    string `json:"token_type"`
 }
 
 type ErrorResponse struct {
-	Error string `json:"error"`
+	Error   string `json:"error"`
 	Message string `json:"message"`
-	Code int `json:"code"`
+	Code    int    `json:"code"`
 }

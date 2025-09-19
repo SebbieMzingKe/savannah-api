@@ -14,7 +14,7 @@ type CustomerHandler struct {
 }
 
 func NewCustomerHandler(db *gorm.DB) *CustomerHandler {
-	return &CustomerHandler{}
+	return &CustomerHandler{db: db}
 }
 
 // CreateCustomer creates new customer
@@ -32,7 +32,7 @@ func (h *CustomerHandler) CreateCustomer(c *gin.Context) {
 
 	var existingCustomer models.Customer
 
-	if err := h.db.Where("code = ?", req.Code).First(&existingCustomer).Error; err != nil {
+	if err := h.db.Where("code = ?", req.Code).First(&existingCustomer).Error; err == nil {
 		c.JSON(http.StatusConflict, models.ErrorResponse{
 			Error:   "customer_exists",
 			Message: "customer with this code already exists",

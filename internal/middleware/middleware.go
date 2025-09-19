@@ -178,8 +178,8 @@ func RateLimitMiddleware() gin.HandlerFunc {
 		client.requests = append(client.requests, now)
 
 		c.Header("X-RateLimit-Limit", fmt.Sprintf("%d", client.limit))
-		c.Header("X-RateLimit-Limit", fmt.Sprintf("%d", client.limit-len(client.requests)))
-		c.Header("X-RateLimit-Limit", fmt.Sprintf("%d", now.Add(client.window).Unix()))
+		c.Header("X-RateLimit-Remaining", fmt.Sprintf("%d", client.limit-len(client.requests)))
+		c.Header("X-RateLimit-Reset", fmt.Sprintf("%d", now.Add(client.window).Unix()))
 
 		c.Next()
 	}

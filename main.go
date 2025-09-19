@@ -43,9 +43,9 @@ func init()  {
 func main() {
 
 	smsService := services.NewSMSService(
-		os.Getenv("AFRICAS_TALKING_USERNAME"),
-		os.Getenv("AFRICAS_TALKING_API_KEY"),
-		os.Getenv("AFRICAS_TALKING_SENDER_ID"),
+		os.Getenv("AFRICASTALKING_USERNAME"),
+		os.Getenv("AFRICASTALKING_API_KEY"),
+		os.Getenv("AFRICASTALKING_SENDER_ID"),
 	)
 
 
@@ -61,9 +61,9 @@ func main() {
 
 	auth := r.Group("/auth")
 	{
-		auth.POST("/login", authHandler.Login)
-		auth.POST("/callback", authHandler.Callback)
-		auth.GET("/userinfo",)
+		auth.GET("/login", authHandler.Login)
+		auth.GET("/callback", authHandler.Callback)
+		auth.GET("/userinfo", middleware.AdminMiddleware(), authHandler.UserInfo)
 	}
 
 	api := r.Group("/api/v1")

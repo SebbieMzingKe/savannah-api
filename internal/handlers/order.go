@@ -14,10 +14,10 @@ import (
 
 type OrderHandler struct {
 	db         *gorm.DB
-	smsService *services.SMSService
+	smsService services.SMSServiceInterface
 }
 
-func NewOrderHandler(db *gorm.DB, smsService *services.SMSService) *OrderHandler {
+func NewOrderHandler(db *gorm.DB, smsService services.SMSServiceInterface) *OrderHandler {
 	return &OrderHandler{
 		db:         db,
 		smsService: smsService,
@@ -40,7 +40,7 @@ func (h *OrderHandler) CreateOrder(c *gin.Context) {
 
 	if err := h.db.First(&customer, req.CustomerID).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
-			c.JSON(http.StatusInternalServerError, models.ErrorResponse{
+			c.JSON(http.StatusNotFound, models.ErrorResponse{
 				Error:   "customer not found",
 				Message: "customer not found",
 				Code:    http.StatusNotFound,
@@ -71,7 +71,7 @@ func (h *OrderHandler) CreateOrder(c *gin.Context) {
 		return
 	}
 
-	h.db.Preload("customer").First(&order, order.ID)
+	h.db.Preload("Customer").First(&order, order.ID)
 
 	go h.sendOrderNotification(customer, order)
 
@@ -82,6 +82,9 @@ func (h *OrderHandler) GetOrders(c *gin.Context) {
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "10"))
 	customerID := c.Query("customer_id")
+	if page < 1 {
+		page = 1
+	}
 	offset := (page - 1) * limit
 
 	var orders []models.Order
@@ -94,7 +97,7 @@ func (h *OrderHandler) GetOrders(c *gin.Context) {
 
 	query.Count(&total)
 
-	if err := query.Preload("customer").Offset(offset).Limit(limit).Find(&orders).Error; err != nil {
+	if err := query.Preload("Customer").Offset(offset).Limit(limit).Find(&orders).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, models.ErrorResponse{
 			Error:   "database error",
 			Message: "failed to retrieve orders",
@@ -146,10 +149,10 @@ func (h *OrderHandler) UpdateOrder(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
 
 	if err != nil {
-		c.JSON(http.StatusNotFound, models.ErrorResponse{
+		c.JSON(http.StatusBadRequest, models.ErrorResponse{
 			Error:   "invalid id",
 			Message: "invalid order id",
-			Code:    http.StatusNotFound,
+			Code:    http.StatusBadRequest,
 		})
 		return
 	}
@@ -191,7 +194,7 @@ func (h *OrderHandler) UpdateOrder(c *gin.Context) {
 	if req.Amount != 0 {
 		order.Amount = req.Amount
 	}
-	if req.Time.IsZero() {
+	if !req.Time.IsZero() {
 		order.Time = req.Time
 	}
 
@@ -213,15 +216,15 @@ func (h *OrderHandler) DeleteOrder(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
 
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, models.ErrorResponse{
+		c.JSON(http.StatusBadRequest, models.ErrorResponse{
 			Error:   "invalid id",
 			Message: "invalid order id",
-			Code:    http.StatusInternalServerError,
+			Code:    http.StatusBadRequest,
 		})
 		return
 	}
 
-	if err := h.db.Delete(models.Order{}, id).Error; err != nil {
+	if err := h.db.Delete(&models.Order{}, id).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, models.ErrorResponse{
 			Error:   "database error",
 			Message: "failed to delete order",

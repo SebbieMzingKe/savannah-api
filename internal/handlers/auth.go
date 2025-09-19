@@ -135,12 +135,12 @@ func (h *AuthHandler) Callback(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"auth": response,
+		"auth":  response,
 		"state": state,
 	})
 }
 
-func(h *AuthHandler) UserInfo(c *gin.Context) {
+func (h *AuthHandler) UserInfo(c *gin.Context) {
 	claims, exists := c.Get("claims")
 
 	if !exists {
@@ -154,13 +154,13 @@ func(h *AuthHandler) UserInfo(c *gin.Context) {
 
 	userClaims := claims.(*Claims)
 	c.JSON(http.StatusOK, gin.H{
-		"sub": userClaims.Sub,
+		"sub":   userClaims.Sub,
 		"email": userClaims.Email,
-		"name": userClaims.Name,
-		"iss": userClaims.Iss,
-		"aud": userClaims.Aud,
-		"exp": userClaims.Exp,
-		"iat": userClaims.Iat,
+		"name":  userClaims.Name,
+		"iss":   userClaims.Iss,
+		"aud":   userClaims.Aud,
+		"exp":   userClaims.Exp,
+		"iat":   userClaims.Iat,
 	})
 }
 

@@ -5,10 +5,12 @@ import (
 	"net/http"
 	"os"
 
+
 	"github.com/SebbieMzingKe/customer-order-api/internal/handlers"
 	"github.com/SebbieMzingKe/customer-order-api/internal/middleware"
 	"github.com/SebbieMzingKe/customer-order-api/internal/models"
 	"github.com/SebbieMzingKe/customer-order-api/internal/services"
+
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
 	"gorm.io/driver/postgres"
@@ -17,9 +19,9 @@ import (
 
 var db *gorm.DB
 
-func init()  {
+func init() {
 	if err := godotenv.Load(); err != nil {
-		log.Println("no .env file found")
+		log.Println("No .env file found")
 	}
 
 	var err error
@@ -31,16 +33,26 @@ func init()  {
 
 	db, err = gorm.Open(postgres.Open(dsn), &gorm.Config{})
 	if err != nil {
+
 		log.Fatal("failed to connect to database", err)
 	}
 
 	err = db.AutoMigrate(&models.Customer{}, &models.Order{})
 	if err != nil {
 		log.Fatal("failed to migrate database", err)
+
+		log.Fatal("Failed to connect to database:", err)
+	}
+
+	err = db.AutoMigrate()
+	if err != nil {
+		log.Fatal("Failed to migrate database:", err)
+
 	}
 }
 
 func main() {
+
 
 	smsService := services.NewSMSService(
 		os.Getenv("AFRICASTALKING_USERNAME"),
@@ -58,6 +70,7 @@ func main() {
 	r.GET("/health", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"status": "ok"})
 	})
+
 
 	auth := r.Group("/auth")
 	{
@@ -92,6 +105,7 @@ func main() {
 	if port == "" {
 		port = "8080"
 	}
+
 
 	log.Printf("server is starting on port %s", port)
 	log.Fatal(http.ListenAndServe(":"+port, r))

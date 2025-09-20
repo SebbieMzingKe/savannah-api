@@ -75,7 +75,6 @@ func TestCreateCustomer(t *testing.T) {
 			db := setupTestDB(t)
 			handler := NewCustomerHandler(db)
 
-			// Pre-create customer for duplicate code test
 			if tt.name == "duplicate customer code" {
 				customer := models.Customer{
 					Name:  "Sebbie Mzing",

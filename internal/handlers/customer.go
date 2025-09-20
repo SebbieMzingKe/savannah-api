@@ -161,7 +161,6 @@ func (h *CustomerHandler) UpdateCustomer(c *gin.Context) {
 		return
 	}
 
-	// Apply updates
 	if req.Name != "" {
 		customer.Name = req.Name
 	}

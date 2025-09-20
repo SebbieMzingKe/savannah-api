@@ -84,14 +84,12 @@ func AuthMiddleware() gin.HandlerFunc {
 			return
 		}
 
-		// Additional validation for token validity and expiration
 		if !token.Valid {
 			c.JSON(http.StatusUnauthorized, models.ErrorResponse{Error: "invalid token", Message: "invalid token", Code: http.StatusUnauthorized})
 			c.Abort()
 			return
 		}
 
-		// Check if token is expired (additional check)
 		if claims.ExpiresAt != nil && claims.ExpiresAt.Time.Before(time.Now()) {
 			c.JSON(http.StatusUnauthorized, models.ErrorResponse{Error: "invalid token", Message: "expired token", Code: http.StatusUnauthorized})
 			c.Abort()
@@ -289,7 +287,7 @@ func (h *AuthHandler) Callback(c *gin.Context) {
 	c.JSON(http.StatusOK, response)
 }
 
-// ValidateToken is a helper function to validate a token string.
+// ValidateToken validates a token string.
 func (h *AuthHandler) ValidateToken(tokenString string) (*Claims, error) {
 	secret := []byte(os.Getenv("JWT_SECRET"))
 	if len(secret) == 0 {

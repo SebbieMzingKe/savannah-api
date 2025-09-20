@@ -80,17 +80,13 @@ func (h *OrderHandler) CreateOrder(c *gin.Context) {
 		return
 	}
 
-	// BUG FIX: Removed the redundant database call to preload the customer.
-	// The customer object is already in memory, so we can assign it directly.
-	// h.db.Preload("Customer").First(&order, order.ID) // This line was removed
-	order.Customer = customer // This line was added
+	order.Customer = customer
 
 	go h.sendOrderNotification(customer, order)
 
 	c.JSON(http.StatusCreated, order)
 }
 
-// ... rest of the functions (GetOrders, GetOrder, UpdateOrder, DeleteOrder, sendOrderNotification) remain unchanged ...
 
 func (h *OrderHandler) GetOrders(c *gin.Context) {
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))

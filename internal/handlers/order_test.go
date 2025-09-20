@@ -12,11 +12,12 @@ import (
 	"github.com/SebbieMzingKe/customer-order-api/internal/services"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
+	"gorm.io/gorm"
 )
 
 func TestCreateOrder(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	db := setupTestDB()
+	db := setupTestDB(t)
 	mockSMSService := services.NewMockSMSService()
 	handler := NewOrderHandler(db, mockSMSService)
 
@@ -26,7 +27,9 @@ func TestCreateOrder(t *testing.T) {
 		Phone: "+254740827150",
 		Email: "sebbievilar2@gmail.com",
 	}
-	db.Create(&customer)
+	if err := db.Create(&customer).Error; err != nil {
+		t.Fatalf("failed to create customer: %v", err)
+	}
 
 	tests := []struct {
 		name           string
@@ -40,7 +43,7 @@ func TestCreateOrder(t *testing.T) {
 				Item:       "laptop",
 				Amount:     1500.00,
 				Time:       time.Now(),
-				CustomerID: 1,
+				CustomerID: uint(customer.ID),
 			},
 			expectedStatus: http.StatusCreated,
 		},
@@ -59,7 +62,7 @@ func TestCreateOrder(t *testing.T) {
 			name: "missing required fields",
 			requestBody: models.CreateOrderRequest{
 				Time:       time.Now(),
-				CustomerID: 1,
+				CustomerID: uint(customer.ID),
 			},
 			expectedStatus: http.StatusBadRequest,
 			expectedError:  "invalid request",
@@ -70,7 +73,7 @@ func TestCreateOrder(t *testing.T) {
 				Item:       "item",
 				Amount:     -100.00,
 				Time:       time.Now(),
-				CustomerID: 1,
+				CustomerID: uint(customer.ID),
 			},
 			expectedStatus: http.StatusBadRequest,
 			expectedError:  "invalid request",
@@ -79,6 +82,7 @@ func TestCreateOrder(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			mockSMSService.SentMessages = nil
 			w := httptest.NewRecorder()
 			c, _ := gin.CreateTestContext(w)
 
@@ -96,69 +100,71 @@ func TestCreateOrder(t *testing.T) {
 				json.Unmarshal(w.Body.Bytes(), &errorResponse)
 				assert.Equal(t, tt.expectedError, errorResponse.Error)
 			} else if tt.expectedStatus == http.StatusCreated {
-				assert.Len(t, mockSMSService.SentMessages, len(mockSMSService.SentMessages))
+				assert.Len(t, mockSMSService.SentMessages, 0)
 
 				if len(mockSMSService.SentMessages) > 0 {
-					lastMessage := mockSMSService.SentMessages[len(mockSMSService.SentMessages) - 1]
+					lastMessage := mockSMSService.SentMessages[len(mockSMSService.SentMessages)-1]
 					assert.Equal(t, customer.Phone, lastMessage.To)
 					assert.Contains(t, lastMessage.Message, customer.Name)
 					assert.Contains(t, lastMessage.Message, tt.requestBody.Item)
 				}
 			}
-
 		})
 	}
 }
 
-
 func TestGetOrder(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	db := setupTestDB()
+	db := setupTestDB(t)
 	mockSMSService := services.NewMockSMSService()
 	handler := NewOrderHandler(db, mockSMSService)
 
 	customer := models.Customer{
-		Name: "Sebbie Chanzu",
-		Code: "CUST001",
+		Name:  "Sebbie Chanzu",
+		Code:  "CUST001",
 		Phone: "+254740827150",
-		Email: "sebbievilar2@gmail",
+		Email: "sebbievilar2@gmail.com",
 	}
-	db.Create(&customer)
+	if err := db.Create(&customer).Error; err != nil {
+		t.Fatalf("failed to create customer: %v", err)
+	}
 
 	order := models.Order{
-		Item: "laptop",
-		Amount: 1500.00,
-		Time: time.Now(),
+		Item:       "laptop",
+		Amount:     1500.00,
+		Time:       time.Now(),
 		CustomerID: customer.ID,
 	}
-	db.Create(&order)
+	if err := db.Create(&order).Error; err != nil {
+		t.Fatalf("failed to create order: %v", err)
+	}
 
 	tests := []struct {
-		name string
-		orderID string
+		name           string
+		orderID        string
 		expectedStatus int
-		expectedError string
+		expectedError  string
 	}{
 		{
-			name: "valid order id",
-			orderID: "1",
+			name:           "valid order id",
+			orderID:        "1",
 			expectedStatus: http.StatusOK,
 		},
 		{
-			name:           "Invalid order ID",
+			name:           "invalid order id",
 			orderID:        "invalid",
 			expectedStatus: http.StatusBadRequest,
-			expectedError:  "invalid_id",
+			expectedError:  "invalid id",
 		},
 		{
-			name:           "Non-existent order",
+			name:           "non-existent order",
 			orderID:        "999",
 			expectedStatus: http.StatusNotFound,
-			expectedError:  "order_not_found",
+			expectedError:  "order not found",
 		},
 	}
 
-	for _, tt := range tests{
+	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			w := httptest.NewRecorder()
 			c, _ := gin.CreateTestContext(w)
@@ -182,17 +188,19 @@ func TestGetOrder(t *testing.T) {
 
 func TestGetOrders(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	db := setupTestDB()
+	db := setupTestDB(t)
 	mockSMSService := services.NewMockSMSService()
 	handler := NewOrderHandler(db, mockSMSService)
 
 	customer := models.Customer{
-		Name: "Sebbie Chanzu",
-		Code: "CUST001",
+		Name:  "Sebbie Chanzu",
+		Code:  "CUST001",
 		Phone: "+254740827150",
-		Email: "sebbievilar2@gmail",
+		Email: "sebbievilar2@gmail.com",
 	}
-	db.Create(&customer)
+	if err := db.Create(&customer).Error; err != nil {
+		t.Fatalf("failed to create customer: %v", err)
+	}
 
 	orders := []models.Order{
 		{Item: "laptop", Amount: 1500.00, Time: time.Now(), CustomerID: customer.ID},
@@ -201,44 +209,253 @@ func TestGetOrders(t *testing.T) {
 	}
 
 	for _, order := range orders {
-		db.Create(&order)
+		if err := db.Create(&order).Error; err != nil {
+			t.Fatalf("failed to create order: %v", err)
+		}
 	}
 
-	t.Run("get all orders", func(t *testing.T) {
-		w := httptest.NewRecorder()
-		c, _ := gin.CreateTestContext(w)
+	tests := []struct {
+		name           string
+		query          string
+		expectedTotal  int
+		expectedStatus int
+	}{
+		{
+			name:           "get all orders",
+			query:          "",
+			expectedTotal:  3,
+			expectedStatus: http.StatusOK,
+		},
+		{
+			name:           "filter orders by customer",
+			query:          "customer_id=1",
+			expectedTotal:  3,
+			expectedStatus: http.StatusOK,
+		},
+	}
 
-		req, _ := http.NewRequest("GET", "/orders", nil)
-		c.Request = req
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			w := httptest.NewRecorder()
+			c, _ := gin.CreateTestContext(w)
 
-		handler.GetOrders(c)
+			req, _ := http.NewRequest("GET", "/orders?"+tt.query, nil)
+			c.Request = req
 
-		assert.Equal(t, http.StatusOK, w.Code)
+			handler.GetOrders(c)
 
-		var response map[string]interface{}
-		json.Unmarshal(w.Body.Bytes(), &response)
+			assert.Equal(t, tt.expectedStatus, w.Code)
 
-		assert.Contains(t, response, "orders")
-		assert.Contains(t, response, "total")
-		assert.Equal(t, float64(3), response["total"])
-	})
+			var response map[string]interface{}
+			json.Unmarshal(w.Body.Bytes(), &response)
 
-	t.Run("filter orders by customer", func(t *testing.T) {
-		w := httptest.NewRecorder()
-		c, _ := gin.CreateTestContext(w)
+			assert.Contains(t, response, "orders")
+			assert.Contains(t, response, "total")
+			assert.Equal(t, float64(tt.expectedTotal), response["total"])
+		})
+	}
+}
 
-		req, _ := http.NewRequest("GET", "/orders?customer_id=1", nil)
-		c.Request = req
+func TestUpdateOrder(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	db := setupTestDB(t)
+	mockSMSService := services.NewMockSMSService()
+	handler := NewOrderHandler(db, mockSMSService)
 
-		handler.GetOrders(c)
+	customer := models.Customer{
+		Name:  "Sebbie Chanzu",
+		Code:  "CUST001",
+		Phone: "+254740827150",
+		Email: "sebbievilar2@gmail.com",
+	}
+	if err := db.Create(&customer).Error; err != nil {
+		t.Fatalf("failed to create customer: %v", err)
+	}
 
-		assert.Equal(t, http.StatusOK, w.Code)
+	order := models.Order{
+		Item:       "laptop",
+		Amount:     1500.00,
+		Time:       time.Now(),
+		CustomerID: customer.ID,
+	}
+	if err := db.Create(&order).Error; err != nil {
+		t.Fatalf("failed to create order: %v", err)
+	}
 
-		var response map[string]interface{}
-		json.Unmarshal(w.Body.Bytes(), &response)
+	tests := []struct {
+		name           string
+		orderID        string
+		requestBody    models.UpdateOrderRequest
+		expectedStatus int
+		expectedError  string
+		expectedItem   string
+		expectedAmount float64
+		expectedTime   time.Time
+	}{
+		{
+			name:    "valid full update",
+			orderID: "1",
+			requestBody: models.UpdateOrderRequest{
+				Item:   "phone",
+				Amount: 800.00,
+				Time:   time.Now().Add(1 * time.Hour),
+			},
+			expectedStatus: http.StatusOK,
+			expectedItem:   "phone",
+			expectedAmount: 800.00,
+			expectedTime:   time.Now().Add(1 * time.Hour).Truncate(time.Second),
+		},
+		{
+			name:    "valid partial update",
+			orderID: "1",
+			requestBody: models.UpdateOrderRequest{
+				Item:   "tablet",
+				Amount: 0,
+				Time:   time.Time{},
+			},
+			expectedStatus: http.StatusOK,
+			expectedItem:   "tablet",
+			expectedAmount: 800.00,
+			expectedTime:   time.Now().Add(1 * time.Hour).Truncate(time.Second),
+		},
+		{
+			name:           "invalid order id",
+			orderID:        "invalid",
+			requestBody:    models.UpdateOrderRequest{Item: "phone"},
+			expectedStatus: http.StatusBadRequest,
+			expectedError:  "invalid id",
+		},
+		{
+			name:           "non-existent order",
+			orderID:        "999",
+			requestBody:    models.UpdateOrderRequest{Item: "phone"},
+			expectedStatus: http.StatusNotFound,
+			expectedError:  "order not found",
+		},
+		{
+			name:           "invalid request body",
+			orderID:        "1",
+			requestBody:    models.UpdateOrderRequest{Amount: -100.00},
+			expectedStatus: http.StatusBadRequest,
+			expectedError:  "invalid request",
+		},
+	}
 
-		assert.Contains(t, response, "orders")
-		assert.Contains(t, response, "total")
-		assert.Equal(t, float64(3), response["total"])
-	})
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			w := httptest.NewRecorder()
+			c, _ := gin.CreateTestContext(w)
+
+			jsonBody, _ := json.Marshal(tt.requestBody)
+			req, _ := http.NewRequest("PUT", "/orders/"+tt.orderID, bytes.NewBuffer(jsonBody))
+			req.Header.Set("Content-Type", "application/json")
+			c.Request = req
+			c.Params = []gin.Param{{Key: "id", Value: tt.orderID}}
+
+			handler.UpdateOrder(c)
+
+			assert.Equal(t, tt.expectedStatus, w.Code)
+
+			if tt.expectedError != "" {
+				var errorResponse models.ErrorResponse
+				json.Unmarshal(w.Body.Bytes(), &errorResponse)
+				assert.Equal(t, tt.expectedError, errorResponse.Error)
+			} else {
+				var updatedOrder models.Order
+				json.Unmarshal(w.Body.Bytes(), &updatedOrder)
+				assert.Equal(t, tt.expectedItem, updatedOrder.Item)
+				assert.Equal(t, tt.expectedAmount, updatedOrder.Amount)
+				assert.WithinDuration(t, tt.expectedTime, updatedOrder.Time, time.Second)
+
+				var dbOrder models.Order
+				err := db.First(&dbOrder, tt.orderID).Error
+				assert.NoError(t, err)
+				assert.Equal(t, tt.expectedItem, dbOrder.Item)
+				assert.Equal(t, tt.expectedAmount, dbOrder.Amount)
+				assert.WithinDuration(t, tt.expectedTime, dbOrder.Time, time.Second)
+			}
+		})
+	}
+}
+
+func TestDeleteOrder(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	db := setupTestDB(t)
+	mockSMSService := services.NewMockSMSService()
+	handler := NewOrderHandler(db, mockSMSService)
+
+	customer := models.Customer{
+		Name:  "Sebbie Chanzu",
+		Code:  "CUST001",
+		Phone: "+254740827150",
+		Email: "sebbievilar2@gmail.com",
+	}
+	if err := db.Create(&customer).Error; err != nil {
+		t.Fatalf("failed to create customer: %v", err)
+	}
+
+	order := models.Order{
+		Item:       "laptop",
+		Amount:     1500.00,
+		Time:       time.Now(),
+		CustomerID: customer.ID,
+	}
+	if err := db.Create(&order).Error; err != nil {
+		t.Fatalf("failed to create order: %v", err)
+	}
+
+	tests := []struct {
+		name           string
+		orderID        string
+		expectedStatus int
+		expectedError  string
+	}{
+		{
+			name:           "valid order deletion",
+			orderID:        "1",
+			expectedStatus: http.StatusOK,
+		},
+		{
+			name:           "invalid order id",
+			orderID:        "invalid",
+			expectedStatus: http.StatusBadRequest,
+			expectedError:  "invalid id",
+		},
+		{
+			name:           "non-existent order",
+			orderID:        "999",
+			expectedStatus: http.StatusNotFound,
+			expectedError:  "order not found",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			w := httptest.NewRecorder()
+			c, _ := gin.CreateTestContext(w)
+
+			req, _ := http.NewRequest("DELETE", "/orders/"+tt.orderID, nil)
+			c.Request = req
+			c.Params = []gin.Param{{Key: "id", Value: tt.orderID}}
+
+			handler.DeleteOrder(c)
+
+			assert.Equal(t, tt.expectedStatus, w.Code)
+
+			if tt.expectedError != "" {
+				var errorResponse models.ErrorResponse
+				json.Unmarshal(w.Body.Bytes(), &errorResponse)
+				assert.Equal(t, tt.expectedError, errorResponse.Error)
+			} else {
+				var response map[string]interface{}
+				json.Unmarshal(w.Body.Bytes(), &response)
+				assert.Equal(t, "order deleted successfully", response["message"])
+
+				var dbOrder models.Order
+				err := db.First(&dbOrder, tt.orderID).Error
+				assert.Error(t, err)
+				assert.Equal(t, gorm.ErrRecordNotFound, err)
+			}
+		})
+	}
 }

@@ -13,6 +13,7 @@ require (
 )
 
 require (
+	github.com/jarcoal/httpmock v1.4.1
 	github.com/stretchr/testify v1.10.0
 	gorm.io/driver/sqlite v1.6.0
 )

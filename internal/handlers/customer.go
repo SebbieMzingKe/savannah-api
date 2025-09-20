@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"errors"
 	"net/http"
 	"strconv"
 
@@ -31,7 +32,6 @@ func (h *CustomerHandler) CreateCustomer(c *gin.Context) {
 	}
 
 	var existingCustomer models.Customer
-
 	if err := h.db.Where("code = ?", req.Code).First(&existingCustomer).Error; err == nil {
 		c.JSON(http.StatusConflict, models.ErrorResponse{
 			Error:   "customer_exists",
@@ -49,13 +49,14 @@ func (h *CustomerHandler) CreateCustomer(c *gin.Context) {
 	}
 
 	if err := h.db.Create(&customer).Error; err != nil {
-		c.JSON(http.StatusConflict, models.ErrorResponse{
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse{
 			Error:   "database error",
 			Message: "failed to create customer",
 			Code:    http.StatusInternalServerError,
 		})
 		return
 	}
+
 	c.JSON(http.StatusCreated, customer)
 }
 
@@ -121,8 +122,8 @@ func (h *CustomerHandler) GetCustomer(c *gin.Context) {
 }
 
 func (h *CustomerHandler) UpdateCustomer(c *gin.Context) {
-	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
-
+	idStr := c.Param("id")
+	id, err := strconv.Atoi(idStr)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, models.ErrorResponse{
 			Error:   "invalid id",
@@ -133,9 +134,8 @@ func (h *CustomerHandler) UpdateCustomer(c *gin.Context) {
 	}
 
 	var req models.UpdateCustomerRequest
-
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusNotFound, models.ErrorResponse{
+		c.JSON(http.StatusBadRequest, models.ErrorResponse{
 			Error:   "invalid request",
 			Message: err.Error(),
 			Code:    http.StatusBadRequest,
@@ -145,21 +145,23 @@ func (h *CustomerHandler) UpdateCustomer(c *gin.Context) {
 
 	var customer models.Customer
 	if err := h.db.First(&customer, id).Error; err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			c.JSON(http.StatusNotFound, models.ErrorResponse{
 				Error:   "customer not found",
 				Message: "customer not found",
-				Code:    http.StatusBadRequest,
+				Code:    http.StatusNotFound,
 			})
 			return
 		}
 		c.JSON(http.StatusInternalServerError, models.ErrorResponse{
 			Error:   "database error",
 			Message: "failed to retrieve customer",
-			Code:    http.StatusBadRequest,
+			Code:    http.StatusInternalServerError,
 		})
 		return
 	}
+
+	// Apply updates
 	if req.Name != "" {
 		customer.Name = req.Name
 	}
@@ -167,6 +169,22 @@ func (h *CustomerHandler) UpdateCustomer(c *gin.Context) {
 		customer.Phone = req.Phone
 	}
 	if req.Email != "" {
+		var existingCustomer models.Customer
+		if err := h.db.Where("email = ? AND id != ?", req.Email, id).First(&existingCustomer).Error; err == nil {
+			c.JSON(http.StatusConflict, models.ErrorResponse{
+				Error:   "email already in use",
+				Message: "email already in use",
+				Code:    http.StatusConflict,
+			})
+			return
+		} else if !errors.Is(err, gorm.ErrRecordNotFound) {
+			c.JSON(http.StatusInternalServerError, models.ErrorResponse{
+				Error:   "database error",
+				Message: "failed to check email",
+				Code:    http.StatusInternalServerError,
+			})
+			return
+		}
 		customer.Email = req.Email
 	}
 
@@ -178,17 +196,36 @@ func (h *CustomerHandler) UpdateCustomer(c *gin.Context) {
 		})
 		return
 	}
+
 	c.JSON(http.StatusOK, customer)
 }
 
 func (h *CustomerHandler) DeleteCustomer(c *gin.Context) {
-	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
-
+	idStr := c.Param("id")
+	id, err := strconv.Atoi(idStr)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, models.ErrorResponse{
 			Error:   "invalid id",
 			Message: "invalid customer id",
 			Code:    http.StatusBadRequest,
+		})
+		return
+	}
+
+	var customer models.Customer
+	if err := h.db.First(&customer, id).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			c.JSON(http.StatusNotFound, models.ErrorResponse{
+				Error:   "customer not found",
+				Message: "customer not found",
+				Code:    http.StatusNotFound,
+			})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse{
+			Error:   "database error",
+			Message: "failed to retrieve customer",
+			Code:    http.StatusInternalServerError,
 		})
 		return
 	}
@@ -201,5 +238,6 @@ func (h *CustomerHandler) DeleteCustomer(c *gin.Context) {
 		})
 		return
 	}
+
 	c.JSON(http.StatusOK, gin.H{"message": "customer deleted successfully"})
 }

@@ -29,8 +29,17 @@ func (h *OrderHandler) CreateOrder(c *gin.Context) {
 
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, models.ErrorResponse{
-			Error:   "invalid_request",
+			Error:   "invalid request",
 			Message: err.Error(),
+			Code:    http.StatusBadRequest,
+		})
+		return
+	}
+
+	if req.Item == "" || req.Amount <= 0 || req.CustomerID == 0 {
+		c.JSON(http.StatusBadRequest, models.ErrorResponse{
+			Error:   "invalid request",
+			Message: "missing or invalid fields",
 			Code:    http.StatusBadRequest,
 		})
 		return
@@ -71,12 +80,17 @@ func (h *OrderHandler) CreateOrder(c *gin.Context) {
 		return
 	}
 
-	h.db.Preload("Customer").First(&order, order.ID)
+	// BUG FIX: Removed the redundant database call to preload the customer.
+	// The customer object is already in memory, so we can assign it directly.
+	// h.db.Preload("Customer").First(&order, order.ID) // This line was removed
+	order.Customer = customer // This line was added
 
 	go h.sendOrderNotification(customer, order)
 
 	c.JSON(http.StatusCreated, order)
 }
+
+// ... rest of the functions (GetOrders, GetOrder, UpdateOrder, DeleteOrder, sendOrderNotification) remain unchanged ...
 
 func (h *OrderHandler) GetOrders(c *gin.Context) {
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
@@ -147,7 +161,6 @@ func (h *OrderHandler) GetOrder(c *gin.Context) {
 
 func (h *OrderHandler) UpdateOrder(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
-
 	if err != nil {
 		c.JSON(http.StatusBadRequest, models.ErrorResponse{
 			Error:   "invalid id",
@@ -167,8 +180,16 @@ func (h *OrderHandler) UpdateOrder(c *gin.Context) {
 		return
 	}
 
-	var order models.Order
+	if req.Amount < 0 {
+		c.JSON(http.StatusBadRequest, models.ErrorResponse{
+			Error:   "invalid request",
+			Message: "amount cannot be negative",
+			Code:    http.StatusBadRequest,
+		})
+		return
+	}
 
+	var order models.Order
 	if err := h.db.First(&order, id).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
 			c.JSON(http.StatusNotFound, models.ErrorResponse{
@@ -178,20 +199,18 @@ func (h *OrderHandler) UpdateOrder(c *gin.Context) {
 			})
 			return
 		}
-
 		c.JSON(http.StatusInternalServerError, models.ErrorResponse{
 			Error:   "database error",
 			Message: "failed to retrieve order",
 			Code:    http.StatusInternalServerError,
 		})
 		return
-
 	}
 
 	if req.Item != "" {
 		order.Item = req.Item
 	}
-	if req.Amount != 0 {
+	if req.Amount > 0 {
 		order.Amount = req.Amount
 	}
 	if !req.Time.IsZero() {
@@ -208,13 +227,11 @@ func (h *OrderHandler) UpdateOrder(c *gin.Context) {
 	}
 
 	h.db.Preload("Customer").First(&order, order.ID)
-
 	c.JSON(http.StatusOK, order)
 }
 
 func (h *OrderHandler) DeleteOrder(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
-
 	if err != nil {
 		c.JSON(http.StatusBadRequest, models.ErrorResponse{
 			Error:   "invalid id",
@@ -224,7 +241,25 @@ func (h *OrderHandler) DeleteOrder(c *gin.Context) {
 		return
 	}
 
-	if err := h.db.Delete(&models.Order{}, id).Error; err != nil {
+	var order models.Order
+	if err := h.db.First(&order, id).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			c.JSON(http.StatusNotFound, models.ErrorResponse{
+				Error:   "order not found",
+				Message: "order not found",
+				Code:    http.StatusNotFound,
+			})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse{
+			Error:   "database error",
+			Message: "failed to retrieve order",
+			Code:    http.StatusInternalServerError,
+		})
+		return
+	}
+
+	if err := h.db.Delete(&order).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, models.ErrorResponse{
 			Error:   "database error",
 			Message: "failed to delete order",
@@ -232,6 +267,7 @@ func (h *OrderHandler) DeleteOrder(c *gin.Context) {
 		})
 		return
 	}
+
 	c.JSON(http.StatusOK, gin.H{"message": "order deleted successfully"})
 }
 

@@ -168,6 +168,7 @@ func (h *OrderHandler) UpdateOrder(c *gin.Context) {
 
 	var req models.UpdateOrderRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
+		log.Println("JSON bind error:", err) 
 		c.JSON(http.StatusBadRequest, models.ErrorResponse{
 			Error:   "invalid request",
 			Message: err.Error(),

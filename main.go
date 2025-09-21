@@ -76,7 +76,7 @@ func main() {
 	{
 		auth.GET("/login", authHandler.Login)
 		auth.GET("/callback", authHandler.Callback)
-		auth.GET("/userinfo", middleware.AdminMiddleware(), authHandler.UserInfo)
+		auth.GET("/userinfo", middleware.AuthMiddleware(), authHandler.UserInfo)
 	}
 
 	api := r.Group("/api/v1")

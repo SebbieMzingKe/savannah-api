@@ -16,17 +16,25 @@ import (
 type AuthHandler struct {
 	jwtSecret    []byte
 	provider     *oidc.Provider
-	verifier     *oidc.IDTokenVerifier
+	Verifier     *oidc.IDTokenVerifier
 	oauth2Config *oauth2.Config
 	oidcEnabled  bool
 	redirectURI  string
 }
 
+type Claims struct {
+	Email string `json:"email"`
+	Sub   string `json:"sub"`
+	Name  string `json:"name"`
+	Iss   string `json:"iss"`
+	Aud   string `json:"aud"`
+	Exp   int64  `json:"exp"`
+	Iat   int64  `json:"iat"`
+	jwt.RegisteredClaims
+}
+
 func NewAuthHandler() *AuthHandler {
 	jwtSecret := []byte(os.Getenv("JWT_SECRET"))
-	if len(jwtSecret) == 0 {
-		jwtSecret = []byte("secret-key")
-	}
 
 	h := &AuthHandler{
 		jwtSecret:   jwtSecret,
@@ -51,7 +59,7 @@ func NewAuthHandler() *AuthHandler {
 				RedirectURL:  redirectURI,
 			}
 			h.provider = provider
-			h.verifier = verifier
+			h.Verifier = verifier
 			h.oauth2Config = oauth2Config
 			h.oidcEnabled = true
 			h.redirectURI = redirectURI
@@ -59,17 +67,6 @@ func NewAuthHandler() *AuthHandler {
 	}
 
 	return h
-}
-
-type Claims struct {
-	Email string `json:"email"`
-	Sub   string `json:"sub"`
-	Name  string `json:"name"`
-	Iss   string `json:"iss"`
-	Aud   string `json:"aud"`
-	Exp   int64  `json:"exp"`
-	Iat   int64  `json:"iat"`
-	jwt.RegisteredClaims
 }
 
 func (h *AuthHandler) Login(c *gin.Context) {
@@ -84,16 +81,26 @@ func (h *AuthHandler) Login(c *gin.Context) {
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, models.ErrorResponse{
 			Error:   "invalid request",
-			Message: err.Error(),
+			Message: "invalid request",
 			Code:    http.StatusBadRequest,
 		})
 		return
 	}
+
 	if req.Email == "" || req.Password == "" {
-		c.JSON(http.StatusUnauthorized, models.ErrorResponse{
-			Error:   "invalid credentials",
-			Message: "invalid email or password",
-			Code:    http.StatusUnauthorized,
+		c.JSON(http.StatusBadRequest, models.ErrorResponse{
+			Error:   "invalid request",
+			Message: "invalid request",
+			Code:    http.StatusBadRequest,
+		})
+		return
+	}
+
+	if len(h.jwtSecret) == 0 {
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse{
+			Error:   "token generation failed",
+			Message: "token generation failed",
+			Code:    http.StatusInternalServerError,
 		})
 		return
 	}
@@ -119,7 +126,7 @@ func (h *AuthHandler) Login(c *gin.Context) {
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, models.ErrorResponse{
 			Error:   "token generation failed",
-			Message: "could not generate access token",
+			Message: "token generation failed",
 			Code:    http.StatusInternalServerError,
 		})
 		return
@@ -127,7 +134,7 @@ func (h *AuthHandler) Login(c *gin.Context) {
 
 	response := models.AuthResponse{
 		AccessToken: tokenString,
-		ExpiresIn:   86400,
+		ExpiresIn:   int64(24 * time.Hour / time.Second),
 		TokenType:   "Bearer",
 	}
 
@@ -177,7 +184,7 @@ func (h *AuthHandler) Callback(c *gin.Context) {
 	}
 
 	// Verify ID Token
-	idToken, err := h.verifier.Verify(ctx, rawIDToken)
+	idToken, err := h.Verifier.Verify(ctx, rawIDToken)
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, models.ErrorResponse{
 			Error:   "invalid_id_token",

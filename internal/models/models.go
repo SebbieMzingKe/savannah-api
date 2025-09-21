@@ -54,7 +54,7 @@ type CreateOrderRequest struct {
 type UpdateOrderRequest struct {
 	Item   string    `json:"item"`
 	Amount float64   `json:"amount" binding:"omitempty,min=0"`
-	Time   time.Time `json:"time"`
+	Time   time.Time `json:"time" binding:"omitempty"`
 }
 
 type LoginRequest struct {

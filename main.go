@@ -68,6 +68,10 @@ func main() {
 		c.JSON(http.StatusOK, gin.H{"status": "ok"})
 	})
 
+	r.GET("/", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{"status": "welcome to customer order api"})
+	})
+	
 	auth := r.Group("/auth")
 	{
 		auth.GET("/login", authHandler.Login)

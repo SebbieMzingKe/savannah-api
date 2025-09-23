@@ -22,9 +22,7 @@ func init() {
 	jwt := os.Getenv("JWT_SECRET")
 	fmt.Println("jwt:", jwt)
 	fmt.Println("DATABASE_URL:", dsn)
-	if dsn == "" {
-		panic("database url environment variable is not set")
-	}
+
 
 	var err error
 

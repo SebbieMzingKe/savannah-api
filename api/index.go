@@ -1,6 +1,7 @@
 package api
 
 import (
+	"fmt"
 	"net/http"
 	"os"
 
@@ -17,17 +18,15 @@ var router *gin.Engine
 
 func init() {
 
-	// if os.Getenv("VERCEL") == "" {
-	// 	_ = godotenv.Load()
-	// }
-
-	// if err := godotenv.Load(); err != nil {
-
-	// }
+	dsn := os.Getenv("DATABASE_URL")
+	fmt.Println("DATABASE_URL:", dsn)
+	if dsn == "" {
+		panic("database url environment variable is not set")
+	}
 
 	var err error
 
-	dsn := os.Getenv("DATABASE_URL")
+	dsn = os.Getenv("DATABASE_URL")
 	if dsn == "" {
 		panic("database url ennvironment variable is not set")
 	}

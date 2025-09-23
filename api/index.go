@@ -49,6 +49,10 @@ func init() {
 	router.GET("/health", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"status": "ok"})
 	})
+	
+	router.GET("/", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{"status": "welcome to customer order api"})
+	})
 
 	authHandler := handlers.NewAuthHandler()
 	auth := router.Group("/auth")

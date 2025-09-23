@@ -1,14 +1,14 @@
-package api
+package handlers
 
 import (
 	"fmt"
 	"net/http"
 	"os"
 
-	"github.com/SebbieMzingKe/customer-order-api/handlers"
-	"github.com/SebbieMzingKe/customer-order-api/middleware"
-	"github.com/SebbieMzingKe/customer-order-api/models"
-	"github.com/SebbieMzingKe/customer-order-api/services"
+	"github.com/SebbieMzingKe/customer-order-api/internal/handlers"
+	"github.com/SebbieMzingKe/customer-order-api/internal/middleware"
+	"github.com/SebbieMzingKe/customer-order-api/internal/models"
+	"github.com/SebbieMzingKe/customer-order-api/internal/services"
 	"github.com/gin-gonic/gin"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
@@ -22,7 +22,6 @@ func init() {
 	jwt := os.Getenv("JWT_SECRET")
 	fmt.Println("jwt:", jwt)
 	fmt.Println("DATABASE_URL:", dsn)
-
 
 	var err error
 

@@ -6,7 +6,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/SebbieMzingKe/customer-order-api/models"
+	"github.com/SebbieMzingKe/customer-order-api/internal/models"
 	"github.com/coreos/go-oidc/v3/oidc"
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v4"

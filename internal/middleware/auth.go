@@ -8,8 +8,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/SebbieMzingKe/customer-order-api/handlers"
-	"github.com/SebbieMzingKe/customer-order-api/models"
+	"github.com/SebbieMzingKe/customer-order-api/internal/handlers"
+	"github.com/SebbieMzingKe/customer-order-api/internal/models"
 	"github.com/coreos/go-oidc/v3/oidc"
 	"golang.org/x/oauth2"
 

@@ -257,7 +257,7 @@ func (h *AuthHandler) UserInfo(c *gin.Context) {
 		})
 		return
 	}
-	userClaims := claimsI.(*Claims)
+	userClaims := claimsI.(*models.Claims)
 	c.JSON(http.StatusOK, gin.H{
 		"sub":   userClaims.Sub,
 		"email": userClaims.Email,

@@ -182,7 +182,7 @@ func TestAuthMiddlewareContext(t *testing.T) {
 
 		c.JSON(http.StatusOK, gin.H{
 			"message": "success",
-			"email":   claims.(*Claims).Email,
+			"email":   claims.(*models.Claims).Email,
 		})
 	})
 

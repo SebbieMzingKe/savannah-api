@@ -9,7 +9,6 @@ import (
 	"github.com/SebbieMzingKe/customer-order-api/models"
 	"github.com/SebbieMzingKe/customer-order-api/services"
 	"github.com/gin-gonic/gin"
-	"github.com/joho/godotenv"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
@@ -17,9 +16,14 @@ import (
 var router *gin.Engine
 
 func init() {
-	if err := godotenv.Load(); err != nil {
 
-	}
+	// if os.Getenv("VERCEL") == "" {
+	// 	_ = godotenv.Load()
+	// }
+
+	// if err := godotenv.Load(); err != nil {
+
+	// }
 
 	var err error
 
@@ -49,7 +53,7 @@ func init() {
 	router.GET("/health", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"status": "ok"})
 	})
-	
+
 	router.GET("/", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"status": "welcome to customer order api"})
 	})

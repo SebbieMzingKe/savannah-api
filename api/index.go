@@ -9,7 +9,6 @@ import (
 	"github.com/SebbieMzingKe/customer-order-api/models"
 	"github.com/SebbieMzingKe/customer-order-api/services"
 	"github.com/gin-gonic/gin"
-	"github.com/joho/godotenv"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
@@ -18,13 +17,13 @@ var router *gin.Engine
 
 func init() {
 
-	if os.Getenv("VERCEL") == "" {
-		_ = godotenv.Load()
-	}
+	// if os.Getenv("VERCEL") == "" {
+	// 	_ = godotenv.Load()
+	// }
 
-	if err := godotenv.Load(); err != nil {
+	// if err := godotenv.Load(); err != nil {
 
-	}
+	// }
 
 	var err error
 

@@ -46,3 +46,5 @@ jobs:
           vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
           scope: ${{ secrets.VERCEL_ORG_ID }}
 
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}

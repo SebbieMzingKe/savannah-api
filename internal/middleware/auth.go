@@ -8,8 +8,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/SebbieMzingKe/customer-order-api/handlers"
-	"github.com/SebbieMzingKe/customer-order-api/models"
+	"github.com/SebbieMzingKe/customer-order-api/internal/handlers"
+	"github.com/SebbieMzingKe/customer-order-api/internal/models"
 	"github.com/coreos/go-oidc/v3/oidc"
 	"golang.org/x/oauth2"
 
@@ -64,7 +64,7 @@ func AuthMiddleware() gin.HandlerFunc {
 			secret = []byte("secret-key")
 		}
 
-		claims := &Claims{}
+		claims := &models.Claims{}
 		token, err := jwt.ParseWithClaims(tokenString, claims, func(token *jwt.Token) (interface{}, error) {
 			if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 				return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])

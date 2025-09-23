@@ -1,19 +1,25 @@
-FROM golang:1.22-alpine AS builder
+FROM golang:1.24.2-alpine AS build
 
-WORKDIR /builder
+RUN apk add --no-cache git ca-certificates build-base
+
+WORKDIR /app
 
 COPY go.mod go.sum ./
-
-RUN apk update && apk upgrade --no-cache && apk add --no-cache ca-certificates && go mod download
+RUN go mod download
 
 COPY . .
 
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o main .
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
+    go build -ldflags="-s -w" -o /savanna-api ./main.go
 
-FROM scratch
+FROM alpine:3.19
+RUN apk add --no-cache ca-certificates tzdata
 
-COPY --from=builder /build/main /go/bin/main
+RUN addgroup -S app && adduser -S -G app app
+USER app
 
+COPY --from=build /savanna-api /savanna-api
 EXPOSE 8080
 
-ENTRYPOINT [ "go/bin/main" ]
+ENV PORT=8080
+CMD ["/savanna-api"]

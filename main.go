@@ -5,10 +5,10 @@ import (
 	"net/http"
 	"os"
 
-	"github.com/SebbieMzingKe/customer-order-api/handlers"
-	"github.com/SebbieMzingKe/customer-order-api/middleware"
-	"github.com/SebbieMzingKe/customer-order-api/models"
-	"github.com/SebbieMzingKe/customer-order-api/services"
+	"github.com/SebbieMzingKe/customer-order-api/internal/handlers"
+	"github.com/SebbieMzingKe/customer-order-api/internal/middleware"
+	"github.com/SebbieMzingKe/customer-order-api/internal/models"
+	"github.com/SebbieMzingKe/customer-order-api/internal/services"
 
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
@@ -68,6 +68,10 @@ func main() {
 		c.JSON(http.StatusOK, gin.H{"status": "ok"})
 	})
 
+	r.GET("/", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{"status": "welcome to customer order api"})
+	})
+	
 	auth := r.Group("/auth")
 	{
 		auth.GET("/login", authHandler.Login)

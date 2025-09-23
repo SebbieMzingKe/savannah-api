@@ -1,0 +1,111 @@
+name: CI / CD - build, test, coverage, push to ECR & deploy to ECS
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+env:
+  APP_NAME: savanna-api
+  IMAGE_TAG: ${{ github.sha }}
+
+jobs:
+  test:
+    name: Run tests & coverage
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v4
+        with:
+          go-version: "1.21"
+
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
+
+      - name: Run tests with coverage
+        run: |
+          go test ./... -coverprofile=coverage.out
+          go tool cover -func=coverage.out | sed -n '1,$p'
+          COVERAGE=$(go tool cover -func=coverage.out | grep total: | awk '{print substr($3, 1, length($3)-1)}')
+          echo "Total coverage: $COVERAGE%"
+          THRESHOLD=80.0
+          awk -v cov="$COVERAGE" -v th="$THRESHOLD" 'BEGIN{ if (cov+0 < th+0) {print "coverage check failed"; exit 1} else {print "coverage OK"} }'
+
+      - name: Upload coverage artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: coverage.out
+
+  build-and-deploy:
+    name: Build image, push to ECR, register new task def & update ECS
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        uses: aws-actions/amazon-ecr-login@v1
+
+      - name: Build, tag, push Docker image to ECR
+        env:
+          ECR_REPO: ${{ secrets.ECR_REPOSITORY }}
+        run: |
+          set -e
+          IMAGE="$ECR_REPO:${{ env.IMAGE_TAG }}"
+          echo "Building image $IMAGE"
+          docker build -t "$IMAGE" .
+          docker push "$IMAGE"
+          echo "image=$IMAGE" >> $GITHUB_OUTPUT
+        id: ecr
+
+      - name: Register new task definition revision with updated image
+        env:
+          CLUSTER: ${{ secrets.ECS_CLUSTER }}
+          SERVICE: ${{ secrets.ECS_SERVICE }}
+          TASK_FAMILY: ${{ secrets.ECS_TASK_FAMILY }}
+          ECR_IMAGE: ${{ secrets.ECR_REPOSITORY }}:${{ env.IMAGE_TAG }}
+          AWS_REGION: ${{ secrets.AWS_REGION }}
+        run: |
+          set -e
+          IMAGE="$ECR_IMAGE"
+
+          # Get current task definition for family (latest)
+          ARNS=$(aws ecs list-task-definitions --family-prefix $TASK_FAMILY --sort DESC --region $AWS_REGION --max-results 1)
+          TASK_DEF_ARN=$(echo "$ARNS" | jq -r '.taskDefinitionArns[0]')
+          if [ -z "$TASK_DEF_ARN" ] || [ "$TASK_DEF_ARN" = "null" ]; then
+            echo "No existing task definition found for family $TASK_FAMILY"
+            exit 1
+          fi
+          echo "Current task def: $TASK_DEF_ARN"
+
+          # Describe it
+          aws ecs describe-task-definition --task-definition "$TASK_DEF_ARN" --region $AWS_REGION > current-task-def.json
+
+          # Extract container definitions, update image
+          cat current-task-def.json | \
+            jq --arg img "$IMAGE" '.taskDefinition
+              | { family: .family, networkMode: .networkMode, executionRoleArn: .executionRoleArn, taskRoleArn: .taskRoleArn, containerDefinitions: (.containerDefinitions | map(.image = $img)), requiresCompatibilities: .requiresCompatibilities, cpu: .cpu, memory: .memory }' > new-task-def.json
+
+          # Register new task definition
+          aws ecs register-task-definition --cli-input-json file://new-task-def.json --region $AWS_REGION > register-output.json
+          NEW_TASK_DEF_ARN=$(cat register-output.json | jq -r '.taskDefinition.taskDefinitionArn')
+          echo "Registered new task def: $NEW_TASK_DEF_ARN"
+
+          # Update service to use new task def
+          aws ecs update-service --cluster "$CLUSTER" --service "$SERVICE" --task-definition "$NEW_TASK_DEF_ARN" --force-new-deployment --region $AWS_REGION

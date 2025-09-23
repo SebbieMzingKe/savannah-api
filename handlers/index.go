@@ -1,13 +1,14 @@
-package api
+package handlers
 
 import (
+	"fmt"
 	"net/http"
 	"os"
 
-	"github.com/SebbieMzingKe/customer-order-api/handlers"
-	"github.com/SebbieMzingKe/customer-order-api/middleware"
-	"github.com/SebbieMzingKe/customer-order-api/models"
-	"github.com/SebbieMzingKe/customer-order-api/services"
+	"github.com/SebbieMzingKe/customer-order-api/internal/handlers"
+	"github.com/SebbieMzingKe/customer-order-api/internal/middleware"
+	"github.com/SebbieMzingKe/customer-order-api/internal/models"
+	"github.com/SebbieMzingKe/customer-order-api/internal/services"
 	"github.com/gin-gonic/gin"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
@@ -17,17 +18,14 @@ var router *gin.Engine
 
 func init() {
 
-	// if os.Getenv("VERCEL") == "" {
-	// 	_ = godotenv.Load()
-	// }
-
-	// if err := godotenv.Load(); err != nil {
-
-	// }
+	dsn := os.Getenv("DATABASE_URL")
+	jwt := os.Getenv("JWT_SECRET")
+	fmt.Println("jwt:", jwt)
+	fmt.Println("DATABASE_URL:", dsn)
 
 	var err error
 
-	dsn := os.Getenv("DATABASE_URL")
+	dsn = os.Getenv("DATABASE_URL")
 	if dsn == "" {
 		panic("database url ennvironment variable is not set")
 	}

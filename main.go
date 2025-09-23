@@ -5,8 +5,7 @@ import (
 	"net/http"
 	"os"
 
-
-	"github.com/SebbieMzingKe/customer-order-api/internal/handlers"
+	"github.com/SebbieMzingKe/customer-order-api/handlers"
 	"github.com/SebbieMzingKe/customer-order-api/internal/middleware"
 	"github.com/SebbieMzingKe/customer-order-api/internal/models"
 	"github.com/SebbieMzingKe/customer-order-api/internal/services"
@@ -53,13 +52,11 @@ func init() {
 
 func main() {
 
-
 	smsService := services.NewSMSService(
 		os.Getenv("AFRICASTALKING_USERNAME"),
 		os.Getenv("AFRICASTALKING_API_KEY"),
 		os.Getenv("AFRICASTALKING_SENDER_ID"),
 	)
-
 
 	customerHandler := handlers.NewCustomerHandler(db)
 	orderHandler := handlers.NewOrderHandler(db, smsService)
@@ -70,7 +67,6 @@ func main() {
 	r.GET("/health", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"status": "ok"})
 	})
-
 
 	auth := r.Group("/auth")
 	{
@@ -90,7 +86,7 @@ func main() {
 			customers.PUT("/:id", customerHandler.UpdateCustomer)
 			customers.DELETE("/:id", customerHandler.DeleteCustomer)
 		}
-		
+
 		orders := api.Group("/orders")
 		{
 			orders.POST("", orderHandler.CreateOrder)
@@ -105,7 +101,6 @@ func main() {
 	if port == "" {
 		port = "8080"
 	}
-
 
 	log.Printf("server is starting on port %s", port)
 	log.Fatal(http.ListenAndServe(":"+port, r))

@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"os"
 
-	"github.com/SebbieMzingKe/customer-order-api/internal/handlers"
+	"github.com/SebbieMzingKe/customer-order-api/handlers"
 	"github.com/SebbieMzingKe/customer-order-api/internal/middleware"
 	"github.com/SebbieMzingKe/customer-order-api/internal/models"
 	"github.com/SebbieMzingKe/customer-order-api/internal/services"
@@ -43,7 +43,6 @@ func init() {
 		os.Getenv("AFRICASTALKING_API_KEY"),
 		os.Getenv("AFRICASTALKING_SENDER_ID"),
 	)
-
 
 	router := gin.Default()
 

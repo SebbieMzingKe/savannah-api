@@ -6,8 +6,8 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/SebbieMzingKe/customer-order-api/internal/models"
-	"github.com/SebbieMzingKe/customer-order-api/internal/services"
+	"github.com/SebbieMzingKe/customer-order-api/models"
+	"github.com/SebbieMzingKe/customer-order-api/services"
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )
@@ -86,7 +86,6 @@ func (h *OrderHandler) CreateOrder(c *gin.Context) {
 
 	c.JSON(http.StatusCreated, order)
 }
-
 
 func (h *OrderHandler) GetOrders(c *gin.Context) {
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
@@ -168,7 +167,7 @@ func (h *OrderHandler) UpdateOrder(c *gin.Context) {
 
 	var req models.UpdateOrderRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		log.Println("JSON bind error:", err) 
+		log.Println("JSON bind error:", err)
 		c.JSON(http.StatusBadRequest, models.ErrorResponse{
 			Error:   "invalid request",
 			Message: err.Error(),

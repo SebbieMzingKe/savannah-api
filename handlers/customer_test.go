@@ -7,7 +7,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/SebbieMzingKe/customer-order-api/internal/models"
+	"github.com/SebbieMzingKe/customer-order-api/models"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
 	"gorm.io/driver/sqlite"
@@ -302,7 +302,7 @@ func TestUpdateCustomer(t *testing.T) {
 			},
 			setupCustomer:  true,
 			expectedStatus: http.StatusConflict,
-			expectedError:  "email already in use",      
+			expectedError:  "email already in use",
 		},
 	}
 

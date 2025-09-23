@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/SebbieMzingKe/customer-order-api/internal/models"
+	"github.com/SebbieMzingKe/customer-order-api/models"
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )

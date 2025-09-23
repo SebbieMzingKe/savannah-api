@@ -17,6 +17,11 @@ import (
 var router *gin.Engine
 
 func init() {
+
+	if os.Getenv("VERCEL") == "" {
+		_ = godotenv.Load()
+	}
+
 	if err := godotenv.Load(); err != nil {
 
 	}
@@ -49,7 +54,7 @@ func init() {
 	router.GET("/health", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"status": "ok"})
 	})
-	
+
 	router.GET("/", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"status": "welcome to customer order api"})
 	})

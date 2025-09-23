@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SebbieMzingKe/customer-order-api/internal/models"
-	"github.com/SebbieMzingKe/customer-order-api/internal/services"
+	"github.com/SebbieMzingKe/customer-order-api/models"
+	"github.com/SebbieMzingKe/customer-order-api/services"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
 	"gorm.io/gorm"

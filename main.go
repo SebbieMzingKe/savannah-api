@@ -6,9 +6,9 @@ import (
 	"os"
 
 	"github.com/SebbieMzingKe/customer-order-api/handlers"
-	"github.com/SebbieMzingKe/customer-order-api/internal/middleware"
-	"github.com/SebbieMzingKe/customer-order-api/internal/models"
-	"github.com/SebbieMzingKe/customer-order-api/internal/services"
+	"github.com/SebbieMzingKe/customer-order-api/middleware"
+	"github.com/SebbieMzingKe/customer-order-api/models"
+	"github.com/SebbieMzingKe/customer-order-api/services"
 
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"

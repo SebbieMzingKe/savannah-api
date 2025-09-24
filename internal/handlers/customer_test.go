@@ -297,7 +297,7 @@ func TestUpdateCustomer(t *testing.T) {
 			name:       "email conflict on update",
 			customerID: "1",
 			requestBody: models.UpdateCustomerRequest{
-				// Attempt to use the email that belongs to the conflictCustomer
+				// attempt to use the email that belongs to the conflictCustomer
 				Email: "conflict@example.com",
 			},
 			setupCustomer:  true,
@@ -312,7 +312,7 @@ func TestUpdateCustomer(t *testing.T) {
 			handler := NewCustomerHandler(db)
 
 			if tt.setupCustomer {
-				// Create the primary customer to be updated
+				// create the primary customer to be updated
 				customer := models.Customer{
 					ID:    1,
 					Name:  "Sebbie Chanzu",

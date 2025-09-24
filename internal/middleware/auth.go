@@ -17,16 +17,6 @@ import (
 	"github.com/golang-jwt/jwt/v4"
 )
 
-// Claims defines the structure of the JWT claims.
-// It embeds jwt.RegisteredClaims to handle standard claims like expiration (exp),
-// type Claims struct {
-// 	Email string `json:"email"`
-// 	Name  string `json:"name"`
-// 	Sub   string `json:"sub"`
-// 	Iss   string `json:"iss"`
-// 	jwt.RegisteredClaims
-// }
-
 func CORSMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		c.Writer.Header().Set("Access-Control-Allow-Origin", "*")

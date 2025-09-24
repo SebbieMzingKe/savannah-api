@@ -28,7 +28,6 @@ func generateTestToken(email string, secret []byte, expired bool) string {
 		Name:  "test user",
 		Iss:   "customer-order-api",
 		Aud:   "customer-order-api",
-		// Exp:   expirationTime.Unix(),
 		Iat:   time.Now().Unix(),
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(expirationTime),

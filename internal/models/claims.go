@@ -8,7 +8,6 @@ type Claims struct {
 	Name  string `json:"name"`
 	Iss   string `json:"iss"`
 	Aud   string `json:"aud"`
-	// Exp   int64  `json:"exp"`
 	Iat   int64  `json:"iat"`
 	jwt.RegisteredClaims
 }

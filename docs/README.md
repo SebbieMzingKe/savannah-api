@@ -386,6 +386,9 @@ Create a new order.
 }
 ```
 
+### message sent to the phone(sandbox) upon successful order creation
+<img src="at-sandbox-sceenshot.png" alt="africa's talking sandbox screenshot"/>
+
 #### customer not found
 ```json
 {

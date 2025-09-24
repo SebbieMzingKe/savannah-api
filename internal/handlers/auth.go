@@ -264,7 +264,7 @@ func (h *AuthHandler) UserInfo(c *gin.Context) {
 		"name":  userClaims.Name,
 		"iss":   userClaims.Iss,
 		"aud":   userClaims.Aud,
-		"exp":   userClaims.Exp,
+		// "exp":   userClaims.Exp,
 		"iat":   userClaims.Iat,
 	})
 }

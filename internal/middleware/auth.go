@@ -19,13 +19,13 @@ import (
 
 // Claims defines the structure of the JWT claims.
 // It embeds jwt.RegisteredClaims to handle standard claims like expiration (exp),
-type Claims struct {
-	Email string `json:"email"`
-	Name  string `json:"name"`
-	Sub   string `json:"sub"`
-	Iss   string `json:"iss"`
-	jwt.RegisteredClaims
-}
+// type Claims struct {
+// 	Email string `json:"email"`
+// 	Name  string `json:"name"`
+// 	Sub   string `json:"sub"`
+// 	Iss   string `json:"iss"`
+// 	jwt.RegisteredClaims
+// }
 
 func CORSMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
@@ -42,7 +42,7 @@ func CORSMiddleware() gin.HandlerFunc {
 	}
 }
 
-func AuthMiddleware() gin.HandlerFunc {
+func 	AuthMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		authHeader := c.GetHeader("Authorization")
 		if authHeader == "" {
@@ -288,13 +288,13 @@ func (h *AuthHandler) Callback(c *gin.Context) {
 }
 
 // ValidateToken validates a token string.
-func (h *AuthHandler) ValidateToken(tokenString string) (*Claims, error) {
+func (h *AuthHandler) ValidateToken(tokenString string) (*models.Claims, error) {
 	secret := []byte(os.Getenv("JWT_SECRET"))
 	if len(secret) == 0 {
 		secret = []byte("secret-key")
 	}
 
-	claims := &Claims{}
+	claims := &models.Claims{}
 	token, err := jwt.ParseWithClaims(tokenString, claims, func(token *jwt.Token) (interface{}, error) {
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])

@@ -9,7 +9,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/SebbieMzingKe/customer-order-api/internal/handlers"
 	"github.com/SebbieMzingKe/customer-order-api/internal/models"
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v4"
@@ -23,13 +22,13 @@ func generateTestToken(email string, secret []byte, expired bool) string {
 		expirationTime = time.Now().Add(-24 * time.Hour)
 	}
 
-	claims := &handlers.Claims{
+	claims := &models.Claims{
 		Email: email,
 		Sub:   email,
 		Name:  "test user",
 		Iss:   "customer-order-api",
 		Aud:   "customer-order-api",
-		Exp:   expirationTime.Unix(),
+		// Exp:   expirationTime.Unix(),
 		Iat:   time.Now().Unix(),
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(expirationTime),

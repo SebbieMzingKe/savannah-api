@@ -106,7 +106,8 @@ This endpoint handles **user authentication** via **OpenID Connect (OIDC)**.
 Instead of sending credentials directly, the user is redirected to the **identity provider** (e.g., Google) to sign in.  
 
 <img src="oidc.png" alt="oidc"/>
-- **Endpoint**: `GET {{PROD_URL}}/auth/login`
+- **Endpoint:**
+    `{{PROD_URL}}/auth/login`
 
 ---
 
